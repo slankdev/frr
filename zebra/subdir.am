@@ -58,6 +58,7 @@ zebra_zebra_SOURCES = \
 	zebra/redistribute.c \
 	zebra/router-id.c \
 	zebra/rt_netlink.c \
+	zebra/ge_netlink.c \
 	zebra/rt_socket.c \
 	zebra/rtadv.c \
 	zebra/rtread_getmsg.c \
@@ -94,6 +95,7 @@ zebra_zebra_SOURCES = \
 	zebra/table_manager.c \
 	zebra/zapi_msg.c \
 	zebra/zebra_errors.c \
+	zebra/zebra_seg6.c \
 	# end
 
 zebra/debug_clippy.c: $(CLIPPY_DEPS)
@@ -127,6 +129,8 @@ noinst_HEADERS += \
 	zebra/router-id.h \
 	zebra/rt.h \
 	zebra/rt_netlink.h \
+	zebra/ge_netlink.h \
+	zebra/slankdev_netlink.h \
 	zebra/rtadv.h \
 	zebra/rule_netlink.h \
 	zebra/zebra_mlag.h \
@@ -154,6 +158,7 @@ noinst_HEADERS += \
 	zebra/table_manager.h \
 	zebra/zapi_msg.h \
 	zebra/zebra_errors.h \
+	zebra/zebra_seg6.h \
 	# end
 
 zebra_zebra_irdp_la_SOURCES = \

@@ -197,6 +197,10 @@ int static_vrf_has_config(struct static_vrf *svrf)
 	return 0;
 }
 
+void static_seg6local_init(void)
+{
+}
+
 void static_vrf_init(void)
 {
 	vrf_init(static_vrf_new, static_vrf_enable,

@@ -152,6 +152,7 @@ const char *node_names[] = {
 	"openfabric",		    // OPENFABRIC_NODE
 	"vrrp",			    /* VRRP_NODE */
 	"bmp",			 /* BMP_NODE */
+	"srv6",			 /* SRV6_NODE */
 };
 /* clang-format on */
 

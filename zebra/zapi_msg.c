@@ -64,6 +64,7 @@
 #include "zebra/zapi_msg.h"
 #include "zebra/zebra_errors.h"
 #include "zebra/zebra_mlag.h"
+#include "zebra/zebra_seg6.h"
 
 /* Encoding helpers -------------------------------------------------------- */
 
@@ -2551,6 +2552,10 @@ void (*zserv_handlers[])(ZAPI_HANDLER_ARGS) = {
 	[ZEBRA_IPTABLE_DELETE] = zread_iptable,
 	[ZEBRA_VXLAN_FLOOD_CONTROL] = zebra_vxlan_flood_control,
 	[ZEBRA_VXLAN_SG_REPLAY] = zebra_vxlan_sg_replay,
+	[ZEBRA_SEG6LOCAL_ADD] = zebra_seg6local_add,
+	[ZEBRA_SEG6LOCAL_DELETE] = zebra_seg6local_delete,
+	[ZEBRA_SEG6_ADD] = zebra_seg6_add,
+	[ZEBRA_SEG6_DELETE] = zebra_seg6_delete,
 };
 
 #if defined(HANDLE_ZAPI_FUZZING)

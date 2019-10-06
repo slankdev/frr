@@ -25,6 +25,7 @@
 #include <net/if_arp.h>
 #include <linux/lwtunnel.h>
 #include <linux/mpls_iptunnel.h>
+#include <linux/seg6_iptunnel.h>
 #include <linux/neighbour.h>
 #include <linux/rtnetlink.h>
 
@@ -293,6 +294,46 @@ static vrf_id_t vrf_lookup_by_table(uint32_t table_id, ns_id_t ns_id)
 }
 
 /**
+ * @parse_encap_seg6() - Parses encapsulated seg6 attributes
+ * @tb:         Pointer to rtattr to look for nested items in.
+ * @mode:       SEG6_IPTUN_MODE_{0:INLINE,1:ENCAP,2:L2ENCAP}
+ * @segs:       segs array in6_addr format sized 256.
+ *
+ * Return:      Number of segs.
+ */
+static int parse_encap_seg6(struct rtattr *tb,
+		uint32_t *mode, struct in6_addr *segs)
+{
+	struct rtattr *tb_encap[200] = {0};
+	netlink_parse_rtattr_nested(tb_encap, 200, tb);
+
+	struct seg6_iptunnel_encap *seg =
+		(struct seg6_iptunnel_encap*)tb_encap[SEG6_IPTUNNEL_SRH]+1;
+	*mode = seg->mode;
+	struct ipv6_sr_hdr *srh = seg->srh;
+#if 0
+	printf("%s:--begin--\n", __func__);
+	printf("mode: %d\n", *mode);
+	printf("srh@%p\n", srh);
+	printf(" - nexthdr      : %u\n", srh->nexthdr      );
+	printf(" - hdrlen       : %u\n", srh->hdrlen       );
+	printf(" - type         : %u\n", srh->type         );
+	printf(" - segments_left: %u\n", srh->segments_left);
+	printf(" - first_segment: %u\n", srh->first_segment);
+	printf(" - flags        : %u\n", srh->flags        );
+	printf(" - tag          : %u\n", srh->tag          );
+	printf("%s:--end--\n", __func__);
+#endif
+	size_t n_segs = srh->hdrlen/2;
+	for (size_t i=0; i<n_segs; i++) {
+		char str[128];
+		inet_ntop(AF_INET6, &srh->segments[i], str, sizeof(str));
+		memcpy(&segs[i], &srh->segments[i], sizeof(struct in6_addr));
+	}
+	return n_segs;
+}
+
+/**
  * @parse_encap_mpls() - Parses encapsulated mpls attributes
  * @tb:         Pointer to rtattr to look for nested items in.
  * @labels:     Pointer to store labels in.
@@ -335,6 +376,7 @@ static int netlink_route_change_read_unicast(struct nlmsghdr *h, ns_id_t ns_id,
 
 	int proto = ZEBRA_ROUTE_KERNEL;
 	int index = 0;
+	int encap = 0;
 	int table;
 	int metric = 0;
 	uint32_t mtu = 0;
@@ -452,6 +494,27 @@ static int netlink_route_change_read_unicast(struct nlmsghdr *h, ns_id_t ns_id,
 		tag = *(uint32_t *)RTA_DATA(tb[RTA_FLOW]);
 #endif
 
+	/* SRv6 */
+	uint32_t seg6_mode = 0; /* 1:encap, 2:insert */
+	uint32_t num_segs = 0;
+	struct in6_addr segs[256];
+	if (tb[RTA_ENCAP] && tb[RTA_ENCAP_TYPE]
+			&& *(uint16_t *)RTA_DATA(tb[RTA_ENCAP_TYPE])
+					 == LWTUNNEL_ENCAP_SEG6) {
+		encap = 1;
+		//printf("%s: encap_srv6 \n", __func__);
+		num_segs =
+			parse_encap_seg6(tb[RTA_ENCAP],
+					&seg6_mode, segs);
+		//printf(" mode: %u\n", seg6_mode);
+		for (size_t i=0; i<num_segs; i++) {
+			char str[128];
+			inet_ntop(AF_INET6, &segs[i], str, sizeof(str));
+			//printf(" segs[%zd]: %s\n", i, str);
+		}
+		//nh.type =  NEXTHOP_TYPE_ENCAP;
+	}
+
 	if (tb[RTA_METRICS]) {
 		struct rtattr *mxrta[RTAX_MAX + 1];
 
@@ -557,7 +620,9 @@ static int netlink_route_change_read_unicast(struct nlmsghdr *h, ns_id_t ns_id,
 			memset(&nh, 0, sizeof(nh));
 
 			if (bh_type == BLACKHOLE_UNSPEC) {
-				if (index && !gate)
+				if (encap)
+					nh.type = NEXTHOP_TYPE_ENCAP;
+				else if (index && !gate)
 					nh.type = NEXTHOP_TYPE_IFINDEX;
 				else if (index && gate)
 					nh.type =
@@ -604,6 +669,9 @@ static int netlink_route_change_read_unicast(struct nlmsghdr *h, ns_id_t ns_id,
 			if (num_labels)
 				nexthop_add_labels(&nh, ZEBRA_LSP_STATIC,
 						   num_labels, labels);
+
+			if (num_segs)
+				nexthop_add_segs(&nh, seg6_mode, num_segs, segs);
 
 			rib_add(afi, SAFI_UNICAST, vrf_id, proto, 0, flags, &p,
 				&src_p, &nh, table, metric, mtu, distance, tag);
@@ -679,7 +747,11 @@ static int netlink_route_change_read_unicast(struct nlmsghdr *h, ns_id_t ns_id,
 
 				if (gate) {
 					if (rtm->rtm_family == AF_INET) {
-						if (index)
+						if (encap)
+							nh = route_entry_nexthop_encap_add(
+								re, seg6_mode, num_segs ,segs,
+								nh_vrf_id);
+						else if (index)
 							nh = route_entry_nexthop_ipv4_ifindex_add(
 								re, gate,
 								prefsrc, index,
@@ -3004,4 +3076,9 @@ int netlink_mpls_multipath(int cmd, struct zebra_dplane_ctx *ctx)
 	return netlink_talk_info(netlink_talk_filter, &req.n,
 				 dplane_ctx_get_ns(ctx), 0);
 }
+
+int netlink_seg6_multipath(int cmd, struct zebra_dplane_ctx *ctx)
+{
+}
+
 #endif /* HAVE_NETLINK */

@@ -36,6 +36,7 @@
 
 DEFINE_MTYPE_STATIC(LIB, NEXTHOP, "Nexthop")
 DEFINE_MTYPE_STATIC(LIB, NH_LABEL, "Nexthop label")
+DEFINE_MTYPE_STATIC(LIB, NH_SEGS, "Nexthop segs")
 
 static int _nexthop_labels_cmp(const struct nexthop *nh1,
 			       const struct nexthop *nh2)
@@ -279,6 +280,16 @@ bool nexthop_same_no_labels(const struct nexthop *nh1,
 		return false;
 
 	return true;
+}
+
+void nexthop_add_segs(struct nexthop *nexthop, int mode,
+		size_t num_segs, struct in6_addr *segs)
+{
+	nexthop->nh_seg6_mode = mode;
+	struct seg6_segs *segs_tmp = XCALLOC(MTYPE_NH_SEGS, sizeof(struct seg6_segs));
+	segs_tmp->num_segs = num_segs;
+	memcpy(segs_tmp->segs, segs, num_segs * sizeof(struct in6_addr));
+	nexthop->nh_seg6_segs = segs_tmp;
 }
 
 /* Update nexthop with label information. */
