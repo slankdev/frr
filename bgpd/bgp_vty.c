@@ -24,6 +24,7 @@
 #include "lib/json.h"
 #include "lib_errors.h"
 #include "lib/zclient.h"
+#include "lib/srv6.h"
 #include "prefix.h"
 #include "plist.h"
 #include "buffer.h"
@@ -1026,6 +1027,8 @@ DEFUN_NOSH (router_bgp,
        AS_STR
        BGP_INSTANCE_HELP_STR)
 {
+	LOG_CLI(argc, argv);
+
 	int idx_asn = 2;
 	int idx_view_vrf = 3;
 	int idx_vrf = 4;
@@ -1196,6 +1199,7 @@ DEFPY (bgp_router_id,
        "Override configured router identifier\n"
        "Manually configured router identifier\n")
 {
+	LOG_CLI(argc, argv);
 	VTY_DECLVAR_CONTEXT(bgp, bgp);
 	bgp_router_id_static_set(bgp, router_id);
 	return CMD_SUCCESS;
@@ -6496,6 +6500,8 @@ DEFPY (af_rd_vpn_export,
        "For routes leaked from current address-family to vpn\n"
        "Route Distinguisher (<as-number>:<number> | <ip-address>:<number>)\n")
 {
+	LOG_CLI(argc, argv);
+
 	VTY_DECLVAR_CONTEXT(bgp, bgp);
 	struct prefix_rd prd;
 	int ret;
@@ -6524,6 +6530,10 @@ DEFPY (af_rd_vpn_export,
 	vpn_leak_prechange(BGP_VPN_POLICY_DIR_TOVPN, afi,
 			   bgp_get_default(), bgp);
 
+	struct bgp *bgp_vpn = bgp_get_default();
+	if (bgp_vpn->vpn_policy[afi].enable_srv6_vpn)
+		bgp->vpn_policy[afi].enable_srv6_vpn = true;
+
 	if (yes) {
 		bgp->vpn_policy[afi].tovpn_rd = prd;
 		SET_FLAG(bgp->vpn_policy[afi].flags,
@@ -6548,6 +6558,62 @@ ALIAS (af_rd_vpn_export,
        "Between current address-family and vpn\n"
        "For routes leaked from current address-family to vpn\n")
 
+DEFUN (segment_routing_ipv6,
+       segment_routing_ipv6_cmd,
+       "[no] segment-routing-ipv6",
+       NO_STR
+       "Enable or Disable Segment-Routing-IPv6\n")
+{
+	LOG_CLI(argc, argv);
+
+	int idx = 0;
+	bool yes = true;
+	if (argv_find(argv, argc, "no", &idx))
+		yes = false;
+
+	struct bgp *bgp = bgp_get_default();
+	bgp->vpn_policy[AFI_IP].enable_srv6_vpn = yes;
+	return CMD_SUCCESS;
+}
+
+DEFUN (af_sid_vpn_export_locator,
+       af_sid_vpn_export_locator_cmd,
+       "[no] sid vpn export locator default",
+       NO_STR
+       "SRv6-SID value for VRF\n"
+       "Between current address-family and vpn\n"
+       "For routes leaked from current address-family to vpn\n"
+			 "Specify locator\n"
+			 "Specify default locator\n")
+{
+	LOG_CLI(argc, argv);
+
+	int idx = 0;
+	bool yes = true;
+	if (argv_find(argv, argc, "no", &idx))
+		yes = false;
+
+	if (!yes) {
+		zlog_err("%s: negate mode isn't implemented", __func__);
+		return CMD_WARNING_CONFIG_FAILED;
+	}
+
+	VTY_DECLVAR_CONTEXT(bgp, bgp);
+	afi_t afi = vpn_policy_getafi(vty, bgp, false);
+
+	vpn_leak_prechange(BGP_VPN_POLICY_DIR_TOVPN, afi, bgp_get_default(), bgp);
+
+	if (sid_zero(&bgp->vpn_policy[afi].tovpn_sid)) {
+		SET_FLAG(bgp->vpn_policy[afi].flags,
+			 BGP_VPN_POLICY_TOVPN_SID_AUTO);
+		bgp_srv6_sid_alloc();
+	}
+
+	vpn_leak_postchange(BGP_VPN_POLICY_DIR_TOVPN, afi, bgp_get_default(), bgp);
+
+	return CMD_SUCCESS;
+}
+
 DEFPY (af_label_vpn_export,
        af_label_vpn_export_cmd,
        "[no] label vpn export <(0-1048575)$label_val|auto$label_auto>",
@@ -6558,6 +6624,8 @@ DEFPY (af_label_vpn_export,
        "Label Value <0-1048575>\n"
        "Automatically assign a label\n")
 {
+	LOG_CLI(argc, argv);
+
 	VTY_DECLVAR_CONTEXT(bgp, bgp);
 	mpls_label_t label = MPLS_LABEL_NONE;
 	afi_t afi;
@@ -6648,6 +6716,8 @@ DEFPY (af_nexthop_vpn_export,
        "IPv4 prefix\n"
        "IPv6 prefix\n")
 {
+	LOG_CLI(argc, argv);
+
 	VTY_DECLVAR_CONTEXT(bgp, bgp);
 	afi_t afi;
 	struct prefix p;
@@ -6724,6 +6794,8 @@ DEFPY (af_rt_vpn_imexport,
        "both import: match any and export: set\n"
        "Space separated route target list (A.B.C.D:MN|EF:OPQR|GHJK:MN)\n")
 {
+	LOG_CLI(argc, argv);
+
 	VTY_DECLVAR_CONTEXT(bgp, bgp);
 	int ret;
 	struct ecommunity *ecom = NULL;
@@ -6871,6 +6943,8 @@ DEFPY(af_import_vrf_route_map, af_import_vrf_route_map_cmd,
       "Specify route map\n"
       "name of route-map\n")
 {
+	LOG_CLI(argc, argv);
+
 	VTY_DECLVAR_CONTEXT(bgp, bgp);
 	vpn_policy_direction_t dir = BGP_VPN_POLICY_DIR_FROMVPN;
 	afi_t afi;
@@ -6940,6 +7014,7 @@ DEFPY(bgp_imexport_vrf, bgp_imexport_vrf_cmd,
       "VRF to import from\n"
       "The name of the VRF\n")
 {
+	LOG_CLI(argc, argv);
 	VTY_DECLVAR_CONTEXT(bgp, bgp);
 	struct listnode *node;
 	struct bgp *vrf_bgp, *bgp_default;
@@ -7028,6 +7103,7 @@ DEFPY (bgp_imexport_vpn,
        "Export routes from this address-family\n"
        "to/from default instance VPN RIB\n")
 {
+	LOG_CLI(argc, argv);
 	VTY_DECLVAR_CONTEXT(bgp, bgp);
 	int previous_state;
 	afi_t afi;
@@ -7094,6 +7170,7 @@ DEFPY (af_routetarget_import,
        "Import routes to this address-family\n"
        "Space separated route target list (A.B.C.D:MN|EF:OPQR|GHJK:MN)\n")
 {
+	LOG_CLI(argc, argv);
 	VTY_DECLVAR_CONTEXT(bgp, bgp);
 	int ret;
 	struct ecommunity *ecom = NULL;
@@ -7144,6 +7221,7 @@ DEFUN_NOSH (address_family_ipv4_safi,
 	"Address Family\n"
 	BGP_SAFI_WITH_LABEL_HELP_STR)
 {
+	LOG_CLI(argc, argv);
 
 	if (argc == 3) {
 		VTY_DECLVAR_CONTEXT(bgp, bgp);
@@ -12084,6 +12162,7 @@ DEFUN (bgp_redistribute_ipv4,
        "Redistribute information from another routing protocol\n"
        FRR_IP_REDIST_HELP_STR_BGPD)
 {
+	LOG_CLI(argc, argv);
 	VTY_DECLVAR_CONTEXT(bgp, bgp);
 	int idx_protocol = 1;
 	int type;
@@ -12800,6 +12879,11 @@ void bgp_vpn_policy_config_write_afi(struct vty *vty, struct bgp *bgp,
 	    || CHECK_FLAG(bgp->af_flags[afi][SAFI_UNICAST],
 			  BGP_CONFIG_VRF_TO_VRF_EXPORT))
 		return;
+
+	if (CHECK_FLAG(bgp->vpn_policy[afi].flags,
+		BGP_VPN_POLICY_TOVPN_SID_AUTO)) {
+		vty_out(vty, "%*ssid vpn export locator default\n", indent, "");
+	}
 
 	if (CHECK_FLAG(bgp->vpn_policy[afi].flags,
 		BGP_VPN_POLICY_TOVPN_LABEL_AUTO)) {
@@ -14193,6 +14277,7 @@ void bgp_vty_init(void)
 	install_element(BGP_IPV6_NODE, &af_rd_vpn_export_cmd);
 	install_element(BGP_IPV4_NODE, &af_label_vpn_export_cmd);
 	install_element(BGP_IPV6_NODE, &af_label_vpn_export_cmd);
+	install_element(BGP_IPV4_NODE, &af_sid_vpn_export_locator_cmd);
 	install_element(BGP_IPV4_NODE, &af_nexthop_vpn_export_cmd);
 	install_element(BGP_IPV6_NODE, &af_nexthop_vpn_export_cmd);
 	install_element(BGP_IPV4_NODE, &af_rt_vpn_imexport_cmd);
@@ -14217,6 +14302,8 @@ void bgp_vty_init(void)
 	install_element(BGP_IPV6_NODE, &af_no_route_map_vpn_imexport_cmd);
 	install_element(BGP_IPV4_NODE, &af_no_import_vrf_route_map_cmd);
 	install_element(BGP_IPV6_NODE, &af_no_import_vrf_route_map_cmd);
+
+	install_element(BGP_VPNV4_NODE, &segment_routing_ipv6_cmd);
 }
 
 #include "memory.h"

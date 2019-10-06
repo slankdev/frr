@@ -37,6 +37,7 @@
 
 #include "zebra/zebra_router.h"
 #include "zebra/zserv.h"
+#include "zebra/zebra_srv6.h"
 #include "zebra/zebra_vrf.h"
 #include "zebra/zebra_mpls.h"
 #include "zebra/zebra_rnh.h"
@@ -52,6 +53,7 @@
 #include "zebra/ipforward.h"
 #include "zebra/zebra_vxlan_private.h"
 #include "zebra/zebra_pbr.h"
+#include "zebra/ge_netlink.h"
 
 extern int allow_delete;
 
@@ -691,6 +693,22 @@ static void vty_show_ip_route(struct vty *vty, struct route_node *rn,
 						       nexthop->vrf_id));
 			break;
 
+		case NEXTHOP_TYPE_ENCAP:
+		{
+			if (nexthop->nh_seg6_segs && nexthop->nh_seg6_segs->num_segs) {
+				vty_out(vty, " encap seg6 mode %s segs %zd [",
+						nexthop->nh_seg6_mode == INLINE ? "inline" : "encap",
+						nexthop->nh_seg6_segs->num_segs);
+				size_t num_segs = nexthop->nh_seg6_segs->num_segs;
+				for (size_t i=0; i<num_segs; i++ ) {
+					char str[128];
+					inet_ntop(AF_INET6, &nexthop->nh_seg6_segs->segs[i], str, sizeof(str));
+					vty_out(vty, "%s%s", str, i+1<num_segs?" ":"");
+				}
+				vty_out(vty, "]");
+			}
+			break;
+		}
 		case NEXTHOP_TYPE_IFINDEX:
 			vty_out(vty, " is directly connected, %s",
 				ifindex2ifname(nexthop->ifindex,
@@ -2923,6 +2941,17 @@ static int config_write_forwarding(struct vty *vty)
 		vty_out(vty, "no ipv6 forwarding\n");
 	vty_out(vty, "!\n");
 	return 0;
+}
+
+struct srv6 *srv6_get_default(void)
+{
+	static struct srv6 srv6;
+	static bool first_execution = true;
+	if (first_execution) {
+		srv6.is_enable = false;
+		first_execution = false;
+	}
+	return &srv6;
 }
 
 DEFUN_HIDDEN (show_frr,

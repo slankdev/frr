@@ -178,6 +178,14 @@ typedef enum {
 	ZEBRA_VXLAN_SG_ADD,
 	ZEBRA_VXLAN_SG_DEL,
 	ZEBRA_VXLAN_SG_REPLAY,
+	ZEBRA_SEG6LOCAL_ADD,
+	ZEBRA_SEG6LOCAL_DELETE,
+	ZEBRA_SEG6_ADD,
+	ZEBRA_SEG6_DELETE,
+	ZEBRA_SRV6_SID_ROUTE_ADD,
+	ZEBRA_SRV6_SID_ROUTE_DELETE,
+	ZEBRA_SRV6_GET_LOCATOR,
+	ZEBRA_SRV6_ALLOC_SID,
 } zebra_message_types_t;
 
 struct redist_proto {
@@ -272,6 +280,7 @@ struct zclient {
 	int (*iptable_notify_owner)(ZAPI_CALLBACK_ARGS);
 	int (*vxlan_sg_add)(ZAPI_CALLBACK_ARGS);
 	int (*vxlan_sg_del)(ZAPI_CALLBACK_ARGS);
+	int (*srv6_sid_alloc)(ZAPI_CALLBACK_ARGS);
 };
 
 /* Zebra API message flag. */
@@ -282,6 +291,7 @@ struct zclient {
 #define ZAPI_MESSAGE_MTU      0x10
 #define ZAPI_MESSAGE_SRCPFX   0x20
 #define ZAPI_MESSAGE_LABEL    0x40
+#define ZAPI_MESSAGE_SEG6     0x80
 /*
  * This should only be used by a DAEMON that needs to communicate
  * the table being used is not in the VRF.  You must pass the
@@ -313,6 +323,9 @@ struct zapi_nexthop {
 	/* MPLS labels for BGP-LU or Segment Routing */
 	uint8_t label_num;
 	mpls_label_t labels[MPLS_MAX_LABELS];
+
+	uint8_t sid_num;
+	struct in6_addr sids[SRV6_MAX_SIDS];
 
 	struct ethaddr rmac;
 };
@@ -433,6 +446,65 @@ struct zapi_pw_status {
 	uint32_t status;
 };
 
+struct zapi_seg6local {
+	uint32_t action;
+	uint32_t plen;
+	struct in6_addr sid;
+
+	struct in_addr nh4;
+	struct in6_addr nh6;
+	uint32_t table;
+};
+
+static inline void
+zapi_seg6local_dump(FILE *fp, const struct zapi_seg6local *api)
+{
+	char sid_str[128], nh4_str[128], nh6_str[128];
+	inet_ntop(AF_INET6, &api->sid, sid_str, 128);
+	inet_ntop(AF_INET6, &api->nh6, nh6_str, 128);
+	inet_ntop(AF_INET, &api->nh4, nh4_str, 128);
+	fprintf(fp, "zapi_seg6local.action  : %u\n", api->action);
+	fprintf(fp, "zapi_seg6local.sid/plen: %s/%u\n", sid_str, api->plen);
+	fprintf(fp, "zapi_seg6local.nh4     : %s\n", nh4_str);
+	fprintf(fp, "zapi_seg6local.nh6     : %s\n", nh6_str);
+	fprintf(fp, "zapi_seg6local.table   : %u\n", api->table);
+}
+
+struct zapi_seg6 {
+	int32_t afi;
+	struct in_addr pref4;
+	struct in6_addr pref6;
+	uint32_t plen;
+	uint32_t table_id;
+
+	uint32_t mode; /* enum seg6_mode_t */
+	uint32_t num_segs;
+	struct in6_addr segs[16];
+};
+
+static inline void
+zapi_seg6_dump(FILE *fp, const struct zapi_seg6 *api)
+{
+	char pref4_[128], pref6_[128];
+	inet_ntop(AF_INET, &api->pref4, pref4_, 128);
+	inet_ntop(AF_INET6, &api->pref6, pref6_, 128);
+
+	fprintf(fp, "zapi_seg6.afi  : %d\n", api->afi);
+	fprintf(fp, "zapi_seg6.pref4: %s\n", pref4_);
+	fprintf(fp, "zapi_seg6.pref6: %s\n", pref6_);
+	fprintf(fp, "zapi_seg6.plen: %u\n", api->plen);
+	fprintf(fp, "zapi_seg6.tableid: %u\n", api->table_id);
+
+	fprintf(fp, "zapi_seg6.plen: %s(%u)\n", seg6_mode2str(api->mode), api->mode);
+	fprintf(fp, "zapi_seg6.num_segs: %u\n", api->num_segs);
+
+	for (size_t i=0; i<api->num_segs; i++) {
+		char str[128];
+		inet_ntop(AF_INET6, &api->segs[i], str, 128);
+	  fprintf(fp, "zapi_seg6.segs[%zd]: %s\n", i, str);
+	}
+}
+
 enum zapi_route_notify_owner {
 	ZAPI_ROUTE_FAIL_INSTALL,
 	ZAPI_ROUTE_BETTER_ADMIN_WON,
@@ -523,6 +595,10 @@ extern void redist_del_instance(struct redist_proto *, unsigned short);
 extern void zclient_send_vrf_label(struct zclient *zclient, vrf_id_t vrf_id,
 				   afi_t afi, mpls_label_t label,
 				   enum lsp_types_t ltype);
+
+extern void zclient_send_vrf_seg6local_dx4(struct zclient *zclient,
+					 afi_t afi, struct in6_addr *sid, uint32_t vrf_table_id,
+					 bool install);
 
 extern void zclient_send_reg_requests(struct zclient *, vrf_id_t);
 extern void zclient_send_dereg_requests(struct zclient *, vrf_id_t);
@@ -641,6 +717,8 @@ extern int tm_get_table_chunk(struct zclient *zclient, uint32_t chunk_size,
 			      uint32_t *start, uint32_t *end);
 extern int tm_release_table_chunk(struct zclient *zclient, uint32_t start,
 				  uint32_t end);
+
+extern int zclient_srv6_alloc_sid(struct zclient *zclient);
 
 extern int zebra_send_mpls_labels(struct zclient *zclient, int cmd,
 				  struct zapi_labels *zl);

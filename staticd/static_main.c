@@ -142,6 +142,7 @@ int main(int argc, char **argv, char **envp)
 
 	access_list_init();
 	static_vrf_init();
+	static_seg6local_init();
 
 	static_zebra_init();
 	static_vty_init();

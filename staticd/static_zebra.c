@@ -18,6 +18,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 #include <zebra.h>
+#include <linux/seg6_local.h>
 
 #include "thread.h"
 #include "command.h"
@@ -337,6 +338,88 @@ void static_zebra_nht_register(struct route_node *rn,
 	if (zclient_send_rnh(zclient, cmd, &p, false, si->nh_vrf_id) < 0)
 		zlog_warn("%s: Failure to send nexthop to zebra",
 			  __PRETTY_FUNCTION__);
+}
+
+extern void static_zebra_route_adddel_seg6(
+		bool install, vrf_id_t vrf_id,
+		const struct in_addr *prefix, size_t plen,
+		enum seg6_mode_t mode, size_t num_segs, struct in6_addr *segs)
+{
+	struct zapi_seg6 api;
+	memset(&api, 0, sizeof(api));
+
+	api.afi = AF_INET;
+	memcpy(&api.pref4, prefix, sizeof(struct in_addr));
+	api.plen = plen;
+	api.table_id = 0;
+	api.mode = mode;
+	api.num_segs = num_segs;
+	for (size_t i=0; i<api.num_segs; i++)
+		memcpy(&api.segs[i], &segs[i], sizeof(struct in6_addr));
+
+#if 1
+	/* DUMP API structure */
+	zapi_seg6_dump(stdout, &api);
+#endif
+
+	struct stream *s = zclient->obuf;
+	stream_reset(s);
+	zclient_create_header(s, install ?
+			ZEBRA_SEG6_ADD : ZEBRA_SEG6_DELETE,
+			vrf_id);
+
+	stream_putl(s, api.afi);
+	stream_write(s, &api.pref4, sizeof(struct in_addr));
+	stream_write(s, &api.pref6, sizeof(struct in6_addr));
+	stream_putl(s, api.plen);
+	stream_putl(s, api.table_id);
+	stream_putl(s, api.mode);
+	stream_putl(s, api.num_segs);
+	for (size_t i=0; i<api.num_segs; i++)
+		stream_write(s, &api.segs[i], sizeof(struct in6_addr));
+
+	stream_putw_at(s, 0, stream_get_endp(s));
+	zclient_send_message(zclient);
+}
+
+extern void static_zebra_route_adddel_seg6local(
+		bool install, vrf_id_t vrf_id,
+		const struct in6_addr *pref, uint32_t plen, uint32_t action,
+		const struct in_addr *nh4, const struct in6_addr *nh6,
+		uint32_t table)
+{
+	/* Craft API message */
+	struct zapi_seg6local api;
+	memset(&api, 0, sizeof(api));
+
+	api.action = action;
+	memcpy(&api.sid, pref, sizeof(struct in6_addr));
+	api.plen = plen;
+	if (nh4) memcpy(&api.nh4, nh4, sizeof(struct in_addr));
+	if (nh6) memcpy(&api.nh6, nh6, sizeof(struct in6_addr));
+	api.table = table;
+
+#if 1
+	/* DUMP API structure */
+	zapi_seg6local_dump(stdout, &api);
+#endif
+
+	/* Put API object to stream */
+	struct stream *s = zclient->obuf;
+	stream_reset(s);
+	zclient_create_header(s, install ?
+			ZEBRA_SEG6LOCAL_ADD : ZEBRA_SEG6LOCAL_DELETE,
+			vrf_id);
+
+	stream_putl(s, api.action);
+	stream_putl(s, api.plen);
+	stream_write(s, &api.sid, sizeof(struct in6_addr));
+	stream_write(s, &api.nh4, sizeof(struct in_addr));
+	stream_write(s, &api.nh6, sizeof(struct in6_addr));
+	stream_putl(s, api.table);
+	stream_putw_at(s, 0, stream_get_endp(s));
+
+	zclient_send_message(zclient);
 }
 
 extern void static_zebra_route_add(struct route_node *rn,

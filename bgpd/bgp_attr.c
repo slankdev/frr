@@ -54,6 +54,7 @@
 #include "bgp_evpn.h"
 #include "bgp_flowspec_private.h"
 #include "bgp_mac.h"
+#include "bgp_zebra.h" /* for bgp_zebra_srv6_sid_route_adddel */
 
 /* Attribute strings for logging. */
 static const struct message attr_str[] = {
@@ -596,9 +597,13 @@ static void attr_show_all_iterator(struct hash_bucket *bucket, struct vty *vty)
 
 	vty_out(vty, "attr[%ld] nexthop %s\n", attr->refcnt,
 		inet_ntoa(attr->nexthop));
-	vty_out(vty, "\tflags: %" PRIu64 " med: %u local_pref: %u origin: %u weight: %u label: %u\n",
+
+	char sid_str[128];
+	inet_ntop(AF_INET6, &attr->sid, sid_str, 128);
+
+	vty_out(vty, "\tflags: %" PRIu64 " med: %u local_pref: %u origin: %u weight: %u label: %u sid: %s\n",
 		attr->flag, attr->med, attr->local_pref, attr->origin,
-		attr->weight, attr->label);
+		attr->weight, attr->label, sid_str);
 }
 
 void attr_show_all(struct vty *vty)
@@ -2232,6 +2237,34 @@ static bgp_attr_parse_ret_t bgp_attr_psid_sub(int32_t type,
 		}
 	}
 
+	/* Placeholder code for the SRv6 L3 Service type */
+	else if (type == BGP_PREFIX_SID_SRV6_L3_SERVICE) {
+
+		/* Parse L3-SERVICE Sub-TLV */
+		struct in6_addr sid_value;
+		stream_getc(peer->curr); // ignore reserved
+		stream_get(&sid_value, peer->curr, 16); // sid_value
+		uint8_t sid_flags = stream_getc(peer->curr);
+		uint16_t endpoint_behaviour = stream_getw(peer->curr);
+		stream_getc(peer->curr); // ignore reserved
+
+		/* Log L3-SERVICE Sub-TLV */
+		if (BGP_DEBUG(vpn, VPN_ADV_PREFIX_SID)) {
+			char str[128];
+			inet_ntop(AF_INET6, &sid_value, str, sizeof(str));
+			zlog_debug("%s: srv6-l3-srv sid %s, sid-flags 0x%02x, "
+					"end-behaviour 0x%04x",
+					__func__, str, sid_flags, endpoint_behaviour);
+		}
+
+		/* Configure from Info */
+		struct in6_addr nh6;
+		const char *nh6_str = peer->host;
+		inet_pton(AF_INET6, nh6_str, &nh6);
+		bgp_zebra_srv6_sid_route_adddel(&sid_value, 128, &nh6, true);
+		memcpy(&attr->sid, &sid_value, 16);
+	}
+
 	return BGP_ATTR_PARSE_PROCEED;
 }
 
@@ -2898,12 +2931,25 @@ size_t bgp_packet_mpattr_start(struct stream *s, struct peer *peer, afi_t afi,
 			stream_putc(s, 4);
 			stream_put_ipv4(s, attr->nexthop.s_addr);
 			break;
-		case SAFI_MPLS_VPN:
-			stream_putc(s, 12);
-			stream_putl(s, 0); /* RD = 0, per RFC */
-			stream_putl(s, 0);
-			stream_put(s, &attr->mp_nexthop_global_in, 4);
+		case SAFI_MPLS_VPN: {
+			const struct bgp *bgp_vpn = bgp_get_default();
+			if (bgp_vpn->vpn_policy[AFI_IP].enable_srv6_vpn) {
+				stream_putc(s, 16);
+				struct in6_addr nh6;
+				inet_pton(AF_INET6, "2001:aa::1", &nh6);
+				for (size_t i=0; i<16; i++)
+					stream_putc(s, nh6.s6_addr[i]);
+				/* stream_putl(s, 0); #<{(| RD = 0, per RFC |)}># */
+				/* stream_putl(s, 0); */
+				/* stream_put_ipv6(s, &nh6, 16); */
+			} else {
+				stream_putc(s, 12);
+				stream_putl(s, 0); /* RD = 0, per RFC */
+				stream_putl(s, 0);
+				stream_put(s, &attr->mp_nexthop_global_in, 4);
+			}
 			break;
+		}
 		case SAFI_ENCAP:
 		case SAFI_EVPN:
 			stream_putc(s, 4);
@@ -3521,6 +3567,38 @@ bgp_size_t bgp_packet_attribute(struct bgp *bgp, struct peer *peer,
 				stream_putw(s, 0); // flags
 				stream_putl(s, label_index);
 			}
+		}
+	}
+
+	/* SRv6 Service Information Attribute. */
+	if (afi== AFI_IP && safi == SAFI_MPLS_VPN) {
+		struct bgp *bgp_vrf;
+		struct listnode *node, *nnode;
+		for (ALL_LIST_ELEMENTS(bm->bgp, node, nnode, bgp_vrf)) {
+			if (bgp_vrf->inst_type != BGP_INSTANCE_TYPE_VRF)
+				continue;
+
+			struct vpn_policy *pol = &bgp_vrf->vpn_policy[AFI_IP];
+			if (!pol->enable_srv6_vpn)
+				continue;
+
+			struct ecommunity *tovpn_ecom =
+				bgp_vrf->vpn_policy[AFI_IP]
+					.rtlist[BGP_VPN_POLICY_DIR_TOVPN];
+			if (!ecommunity_cmp(attr->ecommunity, tovpn_ecom))
+				continue;
+
+			struct in6_addr *sid = &pol->tovpn_sid;
+			stream_putc(s, BGP_ATTR_FLAG_OPTIONAL|BGP_ATTR_FLAG_TRANS);
+			stream_putc(s, BGP_ATTR_PREFIX_SID);
+			stream_putc(s, 24);       // tlv len
+			stream_putc(s, BGP_PREFIX_SID_SRV6_L3_SERVICE);
+			stream_putw(s, 21);       // sub-tlv len
+			stream_putc(s, 0);        // reserved
+			stream_put(s, sid, 16);   // sid_value
+			stream_putc(s, 0);        // sid_flags
+			stream_putw(s, 0xffff);   // endpoint_behaviour
+			stream_putc(s, 0);        // reserved
 		}
 	}
 

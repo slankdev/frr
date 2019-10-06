@@ -305,6 +305,10 @@ typedef enum {
 	RIB_UPDATE_OTHER
 } rib_update_event_t;
 
+extern struct nexthop *route_entry_nexthop_encap_add(struct route_entry *re,
+						       uint32_t seg6_mode, size_t num_segs, struct in6_addr *segs,
+						       vrf_id_t nh_vrf_id);
+
 extern struct nexthop *route_entry_nexthop_ifindex_add(struct route_entry *re,
 						       ifindex_t ifindex,
 						       vrf_id_t nh_vrf_id);

@@ -29,6 +29,7 @@ extern void bgp_zebra_init_tm_connect(struct bgp *bgp);
 extern uint32_t bgp_zebra_tm_get_id(void);
 extern bool bgp_zebra_tm_chunk_obtained(void);
 extern void bgp_zebra_destroy(void);
+extern int bgp_srv6_sid_alloc(void);
 extern int bgp_zebra_get_table_range(uint32_t chunk_size,
 				     uint32_t *start, uint32_t *end);
 extern int bgp_if_update_all(void);
@@ -79,6 +80,9 @@ extern int bgp_zebra_advertise_all_vni(struct bgp *, int);
 extern int bgp_zebra_dup_addr_detection(struct bgp *bgp);
 extern int bgp_zebra_vxlan_flood_control(struct bgp *bgp,
 					 enum vxlan_flood_control flood_ctrl);
+extern int bgp_zebra_srv6_sid_route_adddel(
+					 struct in6_addr *pref, uint32_t plen,
+					 struct in6_addr *nh6, bool add);
 
 extern int bgp_zebra_num_connects(void);
 

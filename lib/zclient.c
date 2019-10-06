@@ -39,6 +39,9 @@
 #include "pbr.h"
 #include "nexthop_group.h"
 #include "lib_errors.h"
+#include "srv6.h"
+
+#include <linux/seg6_local.h>
 
 DEFINE_MTYPE_STATIC(LIB, ZCLIENT, "Zclient")
 DEFINE_MTYPE_STATIC(LIB, REDIST_INST, "Redistribution instance IDs")
@@ -397,6 +400,39 @@ void zclient_send_vrf_label(struct zclient *zclient, vrf_id_t vrf_id, afi_t afi,
 	stream_putl(s, label);
 	stream_putc(s, afi);
 	stream_putc(s, ltype);
+	stream_putw_at(s, 0, stream_get_endp(s));
+	zclient_send_message(zclient);
+}
+
+void zclient_send_vrf_seg6local_dx4(struct zclient *zclient,
+					 afi_t afi, struct in6_addr *sid, uint32_t vrf_table_id,
+					 bool install)
+{
+	vrf_id_t vrf_id = 0; /* global-vrf */
+	uint8_t nh4[4] = {169,254,99,(uint8_t)vrf_table_id};
+
+	struct zapi_seg6local api;
+	memset(&api, 0, sizeof(api));
+	memcpy(&api.sid, sid, sizeof(struct in6_addr));
+	memcpy(&api.nh4, nh4, 4);
+	api.action = SEG6_LOCAL_ACTION_END_DX4;
+	api.plen = 128;
+
+	struct stream *s = zclient->obuf;
+	stream_reset(s);
+
+	zclient_create_header(s, install
+				? ZEBRA_SEG6LOCAL_ADD
+				: ZEBRA_SEG6LOCAL_DELETE,
+			vrf_id);
+
+	stream_putl(s, api.action);
+	stream_putl(s, api.plen);
+	stream_write(s, &api.sid, sizeof(struct in6_addr));
+	stream_write(s, &api.nh4, sizeof(struct in_addr));
+	stream_write(s, &api.nh6, sizeof(struct in6_addr));
+	stream_putl(s, api.table);
+
 	stream_putw_at(s, 0, stream_get_endp(s));
 	zclient_send_message(zclient);
 }
@@ -966,6 +1002,12 @@ int zapi_route_encode(uint8_t cmd, struct stream *s, struct zapi_route *api)
 						   * sizeof(mpls_label_t));
 			}
 
+			if (CHECK_FLAG(api->message, ZAPI_MESSAGE_SEG6)) {
+				stream_putc(s, api_nh->sid_num);
+				for (size_t i=0; i<api_nh->sid_num; i++)
+					stream_put(s, &api_nh->sids[0], 16);
+			}
+
 			/* Router MAC for EVPN routes. */
 			if (CHECK_FLAG(api->flags, ZEBRA_FLAG_EVPN_ROUTE))
 				stream_put(s, &(api_nh->rmac),
@@ -1127,6 +1169,12 @@ int zapi_route_decode(struct stream *s, struct zapi_route *api)
 				STREAM_GET(&api_nh->labels[0], s,
 					   api_nh->label_num
 						   * sizeof(mpls_label_t));
+			}
+
+			if (CHECK_FLAG(api->message, ZAPI_MESSAGE_SEG6)) {
+				STREAM_GETC(s, api_nh->sid_num);
+				for (size_t i=0; i<api_nh->sid_num; i++)
+					STREAM_GET(&api_nh->sids[0], s, 16);
 			}
 
 			/* Router MAC for EVPN routes. */
@@ -3011,6 +3059,10 @@ static int zclient_read(struct thread *thread)
 			(*zclient->vxlan_sg_del)(command, zclient, length,
 						    vrf_id);
 		break;
+	case ZEBRA_SRV6_ALLOC_SID:
+		if (zclient->srv6_sid_alloc)
+			(*zclient->srv6_sid_alloc)(command, zclient, length, vrf_id);
+		break;
 	default:
 		break;
 	}
@@ -3126,4 +3178,14 @@ void zclient_interface_set_master(struct zclient *client,
 
 	stream_putw_at(s, 0, stream_get_endp(s));
 	zclient_send_message(client);
+}
+
+int zclient_srv6_alloc_sid(struct zclient *zclient)
+{
+	struct stream *s = zclient->obuf;
+	stream_reset(s);
+	zclient_create_header(s, ZEBRA_SRV6_ALLOC_SID, 0);
+	stream_putw_at(s, 0, stream_get_endp(s));
+	zclient_send_message(zclient);
+	return 0;
 }

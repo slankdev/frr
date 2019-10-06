@@ -3042,6 +3042,7 @@ int bgp_update(struct peer *peer, struct prefix *p, uint32_t addpath_id,
 	int connected = 0;
 	int do_loop_check = 1;
 	int has_valid_label = 0;
+	int has_valid_sid = 0;
 #if ENABLE_BGP_VNC
 	int vnc_implicit_withdraw = 0;
 #endif
@@ -3058,6 +3059,9 @@ int bgp_update(struct peer *peer, struct prefix *p, uint32_t addpath_id,
 		has_valid_label = (num_labels > 0) ? 1 : 0;
 	else
 		has_valid_label = bgp_is_valid_label(label);
+
+	if (safi == SAFI_MPLS_VPN && !sid_zero(&attr->sid))
+		has_valid_sid = 1;
 
 	/* When peer's soft reconfiguration enabled.  Record input packet in
 	   Adj-RIBs-In.  */
@@ -3389,6 +3393,15 @@ int bgp_update(struct peer *peer, struct prefix *p, uint32_t addpath_id,
 				bgp_set_valid_label(&extra->label[0]);
 		}
 
+		/* Update SRv6 SID */
+		if (has_valid_sid) {
+			extra = bgp_path_info_extra_get(pi);
+			if (sid_diff(&extra->sid[0], &attr->sid)) {
+				memcpy(&extra->sid[0], &attr->sid, 16);
+				extra->num_sids = 1;
+			}
+		}
+
 #if ENABLE_BGP_VNC
 		if ((afi == AFI_IP || afi == AFI_IP6)
 		    && (safi == SAFI_UNICAST)) {
@@ -3560,6 +3573,15 @@ int bgp_update(struct peer *peer, struct prefix *p, uint32_t addpath_id,
 		}
 		if (!(afi == AFI_L2VPN && safi == SAFI_EVPN))
 			bgp_set_valid_label(&extra->label[0]);
+	}
+
+	/* Update SRv6 SID */
+	if (safi == SAFI_MPLS_VPN) {
+		extra = bgp_path_info_extra_get(new);
+		if (sid_zero(extra->sid)) {
+			memcpy(&extra->sid, &attr->sid, 16);
+			extra->num_sids = 1;
+		}
 	}
 
 	/* Update Overlay Index */
@@ -8969,6 +8991,19 @@ void route_vty_out_detail(struct vty *vty, struct bgp *bgp,
 				vty_out(vty, "      Remote label: %d\n", label);
 		}
 
+		/* Remote SID */
+		if (path->extra && path->extra->num_sids > 0
+		    && safi != SAFI_EVPN) {
+
+			char s0[128];
+			inet_ntop(AF_INET6, &path->extra->sid, s0, sizeof(s0));
+
+			if (json_paths)
+				json_object_string_add(json_path, "remoteSid", s0);
+			else
+				vty_out(vty, "      Remote SID: %s\n", s0);
+		}
+
 		/* Label Index */
 		if (attr->label_index != BGP_INVALID_LABEL_INDEX) {
 			if (json_paths)
@@ -12390,6 +12425,15 @@ static void bgp_config_write_network_vpn(struct vty *vty, struct bgp *bgp,
 				p->prefixlen, rdbuf);
 			if (safi == SAFI_MPLS_VPN)
 				vty_out(vty, " label %u", label);
+
+			struct in6_addr *sid;
+			sid = &bgp_static->sid;
+			if (safi == SAFI_MPLS_VPN &&
+					!sid_zero(sid)) {
+				char str[128];
+				inet_ntop(AF_INET6, sid, str, 128);
+				vty_out(vty, " sid %s", str);
+			}
 
 			if (bgp_static->rmap.name)
 				vty_out(vty, " route-map %s",

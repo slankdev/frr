@@ -25,6 +25,7 @@
 
 #include "prefix.h"
 #include "mpls.h"
+#include "srv6.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,6 +46,7 @@ enum nexthop_types_t {
 	NEXTHOP_TYPE_IPV6,	 /* IPv6 nexthop.  */
 	NEXTHOP_TYPE_IPV6_IFINDEX, /* IPv6 nexthop with ifindex.  */
 	NEXTHOP_TYPE_BLACKHOLE,    /* Null0 nexthop.  */
+	NEXTHOP_TYPE_ENCAP, /* encap */
 };
 
 enum blackhole_type {
@@ -110,6 +112,10 @@ struct nexthop {
 
 	/* Label(s) associated with this nexthop. */
 	struct mpls_label_stack *nh_label;
+
+	/* seg6 */
+	enum seg6_mode_t nh_seg6_mode;
+	struct seg6_segs *nh_seg6_segs;
 };
 
 struct nexthop *nexthop_new(void);
@@ -120,6 +126,9 @@ void nexthops_free(struct nexthop *nexthop);
 void nexthop_add_labels(struct nexthop *, enum lsp_types_t, uint8_t,
 			mpls_label_t *);
 void nexthop_del_labels(struct nexthop *);
+
+void nexthop_add_segs(struct nexthop *nh, int mode,
+		size_t num_segs, struct in6_addr *segs);
 
 /*
  * Hash a nexthop. Suitable for use with hash tables.

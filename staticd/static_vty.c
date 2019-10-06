@@ -27,14 +27,26 @@
 #include "table.h"
 #include "srcdest_table.h"
 #include "mpls.h"
+#include "srv6.h"
 
 #include "static_vrf.h"
 #include "static_memory.h"
 #include "static_vty.h"
 #include "static_routes.h"
+#include "static_zebra.h"
 #ifndef VTYSH_EXTRACT_PL
 #include "staticd/static_vty_clippy.c"
 #endif
+
+#include "zebra/slankdev_netlink.h"
+
+#include <netinet/in.h>
+#include <linux/seg6_genl.h>
+#include <linux/seg6_hmac.h>
+#include <linux/seg6_iptunnel.h>
+#include <linux/seg6_local.h>
+#include <linux/lwtunnel.h>
+
 static struct static_vrf *static_vty_get_unknown_vrf(struct vty *vty,
 						     const char *vrf_name)
 {
@@ -1036,6 +1048,97 @@ DEFPY(ip_route,
 		table_str, false);
 }
 
+DEFPY(ip_route_encap_seg6,
+      ip_route_encap_seg6_cmd,
+      "[no] ip route <A.B.C.D/M$prefix> encap seg6 mode <encap|insert>$mode_str segs WORD$segs_str",
+      NO_STR IP_STR
+      "Establish static routes\n"
+      "IP destination prefix (e.g. 10.0.0.0/8)\n"
+      "Encap type (SRv6-Transit or SRv6-End)\n"
+      "Encap type (SRv6-Transit)\n"
+			"Specify Mode\n"
+			"T.Encaps Mode\n"
+			"T.Insert Mode\n"
+      "Specify segs\n"
+      "Specify segs\n")
+{
+	bool is_negate = strcmp(argv[0]->arg, "no") == 0;
+	/* char str[128]; */
+	/* prefix2str(prefix, str, sizeof(str)); */
+	//vty_out(vty, "%s prefix=%s mode=%s segs=%s\n", __func__, str, mode_str, segs_str);
+
+	enum seg6_mode_t mode = 0;
+	if (strcmp(mode_str, "encap") == 0) mode = ENCAP;
+	else if (strcmp(mode_str, "insert") == 0) mode = INLINE;
+	else assert(false);
+
+	size_t num_segs = 1;
+	struct in6_addr segs[100];
+
+	const char *ptr = strtok((char*)segs_str, ",");
+	inet_pton(AF_INET6, ptr, &segs[0]);
+	for ( ; ptr; num_segs ++) {
+		assert(num_segs < 90);
+		ptr = strtok(NULL, ",");
+		if (!ptr)
+			break;
+		inet_pton(AF_INET6, ptr, &segs[num_segs]);
+	}
+
+	vrf_id_t vrf_id = 0;
+	static_zebra_route_adddel_seg6(!is_negate, vrf_id,
+			&prefix->prefix, prefix->prefixlen,
+			mode, num_segs, segs);
+	return CMD_SUCCESS;
+}
+
+DEFPY(ipv6_route_encap_seg6local_end,
+      ipv6_route_encap_seg6local_end_cmd,
+      "[no] ipv6 route X:X::X:X/M$prefix encap seg6local action End",
+      NO_STR
+      IPV6_STR
+      "Establish static routes\n"
+      "IPv6 destination prefix (e.g. 3ffe:506::/32)\n"
+      "Encap type (SRv6-Transit or SRv6-End)\n"
+      "Encap type (SRv6-End)\n"
+			"Specify action\n"
+			"End action\n")
+{
+	bool is_negate = strcmp(argv[0]->arg, "no") == 0;
+
+	vrf_id_t vrf_id = 0;
+	static_zebra_route_adddel_seg6local(!is_negate, vrf_id,
+			&prefix->prefix, prefix->prefixlen, SEG6_LOCAL_ACTION_END,
+			NULL/*nouse*/, NULL/*nouse*/, 0/*nouse*/);
+	return CMD_SUCCESS;
+}
+
+DEFPY(ipv6_route_encap_seg6local_end_dx4,
+      ipv6_route_encap_seg6local_end_dx4_cmd,
+      "[no] ipv6 route X:X::X:X/M$prefix encap seg6local action End_DX4 nh4 A.B.C.D",
+      NO_STR
+      IPV6_STR
+      "Establish static routes\n"
+      "IPv6 destination prefix (e.g. 3ffe:506::/32)\n"
+      "Encap type (SRv6-Transit or SRv6-End)\n"
+      "Encap type (SRv6-End)\n"
+			"Specify action\n"
+			"End.DX4 action\n"
+      "Specifty inet nexthop\n"
+      "Specifty inet nexthop\n")
+{
+	bool is_negate = strcmp(argv[0]->arg, "no") == 0;
+	const char *nh4_str_ = argv[is_negate ? 9 : 8]->arg;
+	struct in_addr nh4_;
+	inet_pton(AF_INET, nh4_str_, &nh4_);
+
+	vrf_id_t vrf_id = 0;
+	static_zebra_route_adddel_seg6local(!is_negate, vrf_id,
+			&prefix->prefix, prefix->prefixlen, SEG6_LOCAL_ACTION_END_DX4,
+			&nh4_, NULL/*nouse*/, 0/*nouse*/);
+	return CMD_SUCCESS;
+}
+
 DEFPY(ip_route_vrf,
       ip_route_vrf_cmd,
       "[no] ip route\
@@ -1462,6 +1565,9 @@ void static_vty_init(void)
 	install_element(VRF_NODE, &ip_route_address_interface_vrf_cmd);
 	install_element(CONFIG_NODE, &ip_route_cmd);
 	install_element(VRF_NODE, &ip_route_vrf_cmd);
+	install_element(CONFIG_NODE, &ip_route_encap_seg6_cmd);
+	install_element(CONFIG_NODE, &ipv6_route_encap_seg6local_end_cmd);
+	install_element(CONFIG_NODE, &ipv6_route_encap_seg6local_end_dx4_cmd);
 
 	install_element(CONFIG_NODE, &ipv6_route_blackhole_cmd);
 	install_element(VRF_NODE, &ipv6_route_blackhole_vrf_cmd);

@@ -2995,6 +2995,8 @@ static struct bgp *bgp_create(as_t *as, const char *name,
 		bgp->vpn_policy[afi].tovpn_label = MPLS_LABEL_NONE;
 		bgp->vpn_policy[afi].tovpn_zebra_vrf_label_last_sent =
 			MPLS_LABEL_NONE;
+		memset(&bgp->vpn_policy[afi].tovpn_sid, 0, sizeof(struct in6_addr));
+		memset(&bgp->vpn_policy[afi].tovpn_zebra_vrf_sid_last_sent, 0, sizeof(struct in6_addr));
 
 		bgp->vpn_policy[afi].import_vrf = list_new();
 		bgp->vpn_policy[afi].import_vrf->del =
@@ -3326,6 +3328,9 @@ int bgp_delete(struct bgp *bgp)
 	/* unmap bgp vrf label */
 	vpn_leak_zebra_vrf_label_withdraw(bgp, AFI_IP);
 	vpn_leak_zebra_vrf_label_withdraw(bgp, AFI_IP6);
+
+	/* unmap bgp vrf sid */
+	vpn_leak_zebra_vrf_sid_withdraw(bgp, AFI_IP);
 
 	/* Stop timers. */
 	if (bgp->t_rmap_def_originate_eval) {
@@ -7494,6 +7499,10 @@ static void bgp_config_write_family(struct vty *vty, struct bgp *bgp, afi_t afi,
 
 	bgp_config_write_maxpaths(vty, bgp, afi, safi);
 	bgp_config_write_table_map(vty, bgp, afi, safi);
+
+	if (safi == SAFI_MPLS_VPN)
+		if (bgp->vpn_policy[AFI_IP].enable_srv6_vpn)
+			vty_out(vty, "  segment-routing-ipv6\n");
 
 	if (safi == SAFI_EVPN)
 		bgp_config_write_evpn_info(vty, bgp, afi, safi);

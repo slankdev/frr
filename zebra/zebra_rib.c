@@ -222,6 +222,27 @@ void route_entry_nexthop_delete(struct route_entry *re, struct nexthop *nexthop)
 	re->nexthop_num--;
 }
 
+struct nexthop *route_entry_nexthop_encap_add(struct route_entry *re,
+						uint32_t seg6_mode, size_t num_segs, struct in6_addr *segs,
+						vrf_id_t nh_vrf_id)
+{
+	struct nexthop *nexthop;
+
+	nexthop = nexthop_new();
+	nexthop->type = NEXTHOP_TYPE_ENCAP;
+
+	nexthop->nh_seg6_mode = seg6_mode;
+	nexthop->nh_seg6_segs->num_segs = num_segs;
+	memcpy(nexthop->nh_seg6_segs->segs, segs, num_segs*sizeof(struct in6_addr));
+
+	//if (num_segs)
+	//	nexthop_add_segs(&nh, seg6_mode, num_segs, segs);
+
+	nexthop->vrf_id = nh_vrf_id;
+	route_entry_nexthop_add(re, nexthop);
+
+	return nexthop;
+}
 
 struct nexthop *route_entry_nexthop_ifindex_add(struct route_entry *re,
 						ifindex_t ifindex,

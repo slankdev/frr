@@ -64,6 +64,7 @@
 #include "zebra/zapi_msg.h"
 #include "zebra/zebra_errors.h"
 #include "zebra/zebra_mlag.h"
+#include "zebra/zebra_srv6.h"
 
 /* Encoding helpers -------------------------------------------------------- */
 
@@ -1560,6 +1561,22 @@ static void zread_route_add(ZAPI_HANDLER_ARGS)
 					   api_nh->label_num,
 					   &api_nh->labels[0]);
 		}
+
+		if (CHECK_FLAG(api.message, ZAPI_MESSAGE_SEG6)
+		    && api_nh->type != NEXTHOP_TYPE_BLACKHOLE) {
+
+			if (IS_ZEBRA_DEBUG_RECV) {
+				char str[128];
+				inet_ntop(AF_INET6, &api_nh->sids[0], str, 128);
+				zlog_debug(
+					"%s: adding %d sids (1st=%s)",
+					__func__, api_nh->sid_num, str);
+			}
+
+			uint32_t seg6_mode = 1; /* Encap */
+			nexthop_add_segs(nexthop, seg6_mode,
+					api_nh->sid_num, api_nh->sids);
+		}
 	}
 
 	if (CHECK_FLAG(api.message, ZAPI_MESSAGE_DISTANCE))
@@ -2551,6 +2568,14 @@ void (*zserv_handlers[])(ZAPI_HANDLER_ARGS) = {
 	[ZEBRA_IPTABLE_DELETE] = zread_iptable,
 	[ZEBRA_VXLAN_FLOOD_CONTROL] = zebra_vxlan_flood_control,
 	[ZEBRA_VXLAN_SG_REPLAY] = zebra_vxlan_sg_replay,
+	[ZEBRA_SEG6LOCAL_ADD] = zebra_seg6local_add,
+	[ZEBRA_SEG6LOCAL_DELETE] = zebra_seg6local_delete,
+	[ZEBRA_SEG6_ADD] = zebra_seg6_add,
+	[ZEBRA_SEG6_DELETE] = zebra_seg6_delete,
+	[ZEBRA_SRV6_SID_ROUTE_ADD] = zebra_srv6_sid_route_add,
+	[ZEBRA_SRV6_SID_ROUTE_DELETE] = zebra_srv6_sid_route_delete,
+	[ZEBRA_SRV6_GET_LOCATOR] = zebra_srv6_get_locator,
+	[ZEBRA_SRV6_ALLOC_SID] = zebra_srv6_alloc_sid,
 };
 
 #if defined(HANDLE_ZAPI_FUZZING)

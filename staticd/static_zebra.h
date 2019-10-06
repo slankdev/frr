@@ -24,6 +24,15 @@ extern struct thread_master *master;
 extern void static_zebra_nht_register(struct route_node *rn,
 				      struct static_route *si, bool reg);
 
+extern void static_zebra_route_adddel_seg6(
+		bool install, vrf_id_t vrf_id,
+		const struct in_addr *prefix, size_t plen,
+		enum seg6_mode_t mode, size_t num_segs, struct in6_addr *segs);
+extern void static_zebra_route_adddel_seg6local(
+		bool install, vrf_id_t vrf_id,
+		const struct in6_addr *pref, uint32_t plen, uint32_t action,
+		const struct in_addr *nh4, const struct in6_addr *nh6,
+		uint32_t table);
 extern void static_zebra_route_add(struct route_node *rn,
 				   struct static_route *si_changed,
 				   vrf_id_t vrf_id, safi_t safi, bool install);
