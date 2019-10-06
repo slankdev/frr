@@ -37,6 +37,7 @@
 
 #include "zebra/zebra_router.h"
 #include "zebra/zserv.h"
+#include "zebra/zebra_srv6.h"
 #include "zebra/zebra_vrf.h"
 #include "zebra/zebra_mpls.h"
 #include "zebra/zebra_rnh.h"
@@ -54,6 +55,7 @@
 #include "zebra/zebra_pbr.h"
 #include "zebra/zebra_nhg.h"
 #include "zebra/interface.h"
+#include "zebra/ge_netlink.h"
 
 extern int allow_delete;
 
@@ -384,6 +386,13 @@ static void vty_show_ip_route_detail(struct vty *vty, struct route_node *rn,
 			if (nexthop->weight)
 				vty_out(vty, ", weight %u", nexthop->weight);
 
+			/* SRv6 information */
+			if (nexthop->nh_seg6_segs
+			    && nexthop->nh_seg6_segs->num_segs) {
+				// TODO(slankdev): implement
+				vty_out(vty, ", segs");
+			}
+
 			vty_out(vty, "\n");
 		}
 		vty_out(vty, "\n");
@@ -401,6 +410,7 @@ static void vty_show_ip_route(struct vty *vty, struct route_node *rn,
 	json_object *json_nexthop = NULL;
 	json_object *json_route = NULL;
 	json_object *json_labels = NULL;
+	json_object *json_segs = NULL;
 	time_t uptime;
 	struct tm *tm;
 	struct vrf *vrf = NULL;
@@ -646,6 +656,25 @@ static void vty_show_ip_route(struct vty *vty, struct route_node *rn,
 						       json_labels);
 			}
 
+			if (nexthop->nh_seg6_segs
+					&& nexthop->nh_seg6_segs->num_segs) {
+				json_segs = json_object_new_array();
+
+				for (size_t i=0; i<nexthop->nh_seg6_segs->num_segs; i++) {
+					char s[128];
+					inet_ntop(AF_INET6, &nexthop->nh_seg6_segs->segs[i], s, 128);
+					json_object_array_add( json_segs,
+						json_object_new_string(s));
+				}
+
+				json_object_object_add(json_nexthop, "segs",
+						       json_segs);
+			}
+
+			if (nexthop->seg6local_action > 0) {
+				//TODO(slankdev): implement
+			}
+
 			json_object_array_add(json_nexthops, json_nexthop);
 		}
 
@@ -772,6 +801,21 @@ static void vty_show_ip_route(struct vty *vty, struct route_node *rn,
 				mpls_label2str(nexthop->nh_label->num_labels,
 					       nexthop->nh_label->label, buf,
 					       sizeof buf, 1));
+		}
+
+		if (nexthop->nh_seg6_segs
+				&& nexthop->nh_seg6_segs->num_segs) {
+			char buf[128];
+			snprintf_seg6_segs(buf, 128, nexthop->nh_seg6_segs);
+			vty_out(vty, ", seg6 [%s]", buf);
+		}
+
+		if (nexthop->seg6local_action > 0) {
+			char buf[128];
+			uint32_t action = nexthop->seg6local_action;
+			struct seg6local_context *ctx = &nexthop->seg6local_ctx;
+			seg6local_context2str(buf, 128, ctx, action);
+			vty_out(vty, ", seg6local %s %s", seg6local_action2str(action), buf);
 		}
 
 		if (uptime < ONE_DAY_SECOND)

@@ -1816,14 +1816,15 @@ DEFUN (no_debug_bgp_update_groups,
 
 DEFUN (debug_bgp_vpn,
        debug_bgp_vpn_cmd,
-       "debug bgp vpn <leak-from-vrf|leak-to-vrf|rmap-event|label>",
+       "debug bgp vpn <leak-from-vrf|leak-to-vrf|rmap-event|label|adv-prefix-sid>",
        DEBUG_STR
        BGP_STR
        "VPN routes\n"
        "leaked from vrf to vpn\n"
        "leaked to vrf from vpn\n"
        "route-map updates\n"
-       "labels\n")
+       "labels\n"
+       "advertise BGP-Prefix-SID path attributes\n")
 {
 	int idx = 3;
 
@@ -1847,6 +1848,11 @@ DEFUN (debug_bgp_vpn,
 			DEBUG_ON(vpn, VPN_LEAK_LABEL);
 		else
 			TERM_DEBUG_ON(vpn, VPN_LEAK_LABEL);
+	} else if (argv_find(argv, argc, "adv-prefix-sid", &idx)) {
+		if (vty->node == CONFIG_NODE)
+			DEBUG_ON(vpn, VPN_ADV_PREFIX_SID);
+		else
+			TERM_DEBUG_ON(vpn, VPN_ADV_PREFIX_SID);
 	} else {
 		vty_out(vty, "%% unknown debug bgp vpn keyword\n");
 		return CMD_WARNING_CONFIG_FAILED;
@@ -2035,6 +2041,7 @@ DEFUN (no_debug_bgp,
 	TERM_DEBUG_OFF(vpn, VPN_LEAK_TO_VRF);
 	TERM_DEBUG_OFF(vpn, VPN_LEAK_RMAP_EVENT);
 	TERM_DEBUG_OFF(vpn, VPN_LEAK_LABEL);
+	TERM_DEBUG_OFF(vpn, VPN_ADV_PREFIX_SID);
 	TERM_DEBUG_OFF(flowspec, FLOWSPEC);
 	TERM_DEBUG_OFF(labelpool, LABELPOOL);
 	TERM_DEBUG_OFF(pbr, PBR);
@@ -2109,6 +2116,8 @@ DEFUN_NOSH (show_debugging_bgp,
 		vty_out(vty, "  BGP vpn route-map event debugging is on\n");
 	if (BGP_DEBUG(vpn, VPN_LEAK_LABEL))
 		vty_out(vty, "  BGP vpn label event debugging is on\n");
+	if (BGP_DEBUG(vpn, VPN_ADV_PREFIX_SID))
+		vty_out(vty, "  BGP vpn advertise BGP-Prefix-SID debugging is on\n");
 	if (BGP_DEBUG(flowspec, FLOWSPEC))
 		vty_out(vty, "  BGP flowspec debugging is on\n");
 	if (BGP_DEBUG(labelpool, LABELPOOL))

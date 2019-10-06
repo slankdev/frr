@@ -41,6 +41,7 @@
 #include "bgpd/bgp_debug.h"
 #include "bgpd/bgp_errors.h"
 #include "bgpd/bgp_label.h"
+#include "bgpd/bgp_mplsvpn.h"
 #include "bgpd/bgp_packet.h"
 #include "bgpd/bgp_ecommunity.h"
 #include "bgpd/bgp_lcommunity.h"
@@ -556,7 +557,8 @@ bool attrhash_cmp(const void *p1, const void *p2)
 		    && overlay_index_same(attr1, attr2)
 		    && attr1->nh_ifindex == attr2->nh_ifindex
 		    && attr1->nh_lla_ifindex == attr2->nh_lla_ifindex
-		    && attr1->distance == attr2->distance)
+		    && attr1->distance == attr2->distance
+		    && sid_same(&attr1->sid, &attr2->sid))
 			return true;
 	}
 
@@ -590,9 +592,13 @@ static void attr_show_all_iterator(struct hash_bucket *bucket, struct vty *vty)
 
 	vty_out(vty, "attr[%ld] nexthop %s\n", attr->refcnt,
 		inet_ntoa(attr->nexthop));
-	vty_out(vty, "\tflags: %" PRIu64 " med: %u local_pref: %u origin: %u weight: %u label: %u\n",
+
+	char sid_str[128];
+	inet_ntop(AF_INET6, &attr->sid, sid_str, 128);
+
+	vty_out(vty, "\tflags: %" PRIu64 " med: %u local_pref: %u origin: %u weight: %u label: %u sid: %s\n",
 		attr->flag, attr->med, attr->local_pref, attr->origin,
-		attr->weight, attr->label);
+		attr->weight, attr->label, sid_str);
 }
 
 void attr_show_all(struct vty *vty)
@@ -2226,19 +2232,50 @@ static bgp_attr_parse_ret_t bgp_attr_psid_sub(int32_t type,
 		}
 	}
 
-	/*
-	 * Placeholder code for Unsupported TLV
-	 *  - SRv6 L3 Service TLV (type5)
-	 *  - SRv6 L2 Service TLV (type6)
-	 */
-	else if (type == BGP_PREFIX_SID_SRV6_L3_SERVICE
-	    || type == BGP_PREFIX_SID_SRV6_L2_SERVICE) {
-		if (bgp_debug_update(peer, NULL, NULL, 1))
-			zlog_debug(
-				"%s attr Prefix-SID sub-type=%u is not supported, skipped",
-				peer->host, type);
-		for (int i = 0; i < length; i++)
-			stream_getc(peer->curr);
+	/* Placeholder code for the VPN-SID Service type */
+	else if (type == BGP_PREFIX_SID_VPN_SID) {
+		struct in6_addr sid_value;
+		uint8_t sid_type;
+		uint8_t sid_flags;
+		stream_getc(peer->curr); // reserved
+		sid_type = stream_getc(peer->curr); // sid_type
+		sid_flags = stream_getc(peer->curr); // sid_flags
+		stream_get(&sid_value, peer->curr, 16); // sid_value
+
+		/* Log VPN-SID Sub-TLV */
+		if (BGP_DEBUG(vpn, VPN_ADV_PREFIX_SID)) {
+			char str[128];
+			inet_ntop(AF_INET6, &sid_value, str, sizeof(str));
+			zlog_debug("%s: vpn-sid: sid %s, sid-type 0x%02x sid-flags 0x%02x",
+					__func__, str, sid_type, sid_flags);
+		}
+
+		/* Configure from Info */
+		memcpy(&attr->sid, &sid_value, 16);
+	}
+
+	/* Placeholder code for the SRv6 L3 Service type */
+	else if (type == BGP_PREFIX_SID_SRV6_L3_SERVICE) {
+
+		/* Parse L3-SERVICE Sub-TLV */
+		struct in6_addr sid_value;
+		stream_getc(peer->curr); // ignore reserved
+		stream_get(&sid_value, peer->curr, 16); // sid_value
+		uint8_t sid_flags = stream_getc(peer->curr);
+		uint16_t endpoint_behaviour = stream_getw(peer->curr);
+		stream_getc(peer->curr); // ignore reserved
+
+		/* Log L3-SERVICE Sub-TLV */
+		if (BGP_DEBUG(vpn, VPN_ADV_PREFIX_SID)) {
+			char str[128];
+			inet_ntop(AF_INET6, &sid_value, str, sizeof(str));
+			zlog_debug("%s: srv6-l3-srv sid %s, sid-flags 0x%02x, "
+					"end-behaviour 0x%04x",
+					__func__, str, sid_flags, endpoint_behaviour);
+		}
+
+		/* Configure from Info */
+		memcpy(&attr->sid, &sid_value, 16);
 	}
 
 	return BGP_ATTR_PARSE_PROCEED;
@@ -2907,6 +2944,7 @@ size_t bgp_packet_mpattr_start(struct stream *s, struct peer *peer, afi_t afi,
 	if (afi == AFI_IP
 	    && (safi == SAFI_UNICAST ||
 		safi == SAFI_LABELED_UNICAST ||
+		safi == SAFI_MPLS_VPN ||
 		safi == SAFI_MULTICAST))
 		nh_afi = peer_cap_enhe(peer, afi, safi) ? AFI_IP6 : AFI_IP;
 	else
@@ -2961,7 +2999,14 @@ size_t bgp_packet_mpattr_start(struct stream *s, struct peer *peer, afi_t afi,
 			}
 		} break;
 		case SAFI_MPLS_VPN: {
-			if (attr->mp_nexthop_len
+			const struct bgp *bgp_vpn = bgp_get_default();
+			if (bgp_vpn->vpn_policy[AFI_IP].enable_srv6_vpn) {
+				stream_putc(s, 24);
+				stream_putl(s, 0); /* RD = 0, per RFC */
+				stream_putl(s, 0);
+				stream_put(s, &attr->mp_nexthop_global,
+					   IPV6_MAX_BYTELEN);
+			} else if (attr->mp_nexthop_len
 			    == BGP_ATTR_NHLEN_IPV6_GLOBAL) {
 				stream_putc(s, 24);
 				stream_putl(s, 0); /* RD = 0, per RFC */
@@ -3015,6 +3060,8 @@ void bgp_packet_mpattr_prefix(struct stream *s, afi_t afi, safi_t safi,
 	if (safi == SAFI_MPLS_VPN) {
 		if (addpath_encode)
 			stream_putl(s, addpath_tx_id);
+		if (bgp_get_default()->vpn_policy[AFI_IP].enable_srv6_vpn)
+			encode_label(MPLS_LABEL_IMPLICIT_NULL, label);
 		/* Label, RD, Prefix write. */
 		stream_putc(s, p->prefixlen + 88);
 		stream_put(s, label, BGP_LABEL_BYTES);
@@ -3546,6 +3593,44 @@ bgp_size_t bgp_packet_attribute(struct bgp *bgp, struct peer *peer,
 				stream_putw(s, 0); // flags
 				stream_putl(s, label_index);
 			}
+		}
+	}
+
+	/* SRv6 Service Information Attribute. */
+	if (afi== AFI_IP && safi == SAFI_MPLS_VPN
+			&& bgp_get_default()->vpn_policy[AFI_IP].enable_srv6_vpn
+			&& !sid_zero(&attr->sid)) {
+
+		enum srv6_vpn_version version =
+			bgp_get_default()->vpn_policy[AFI_IP].srv6_vpn_version;
+		switch (version) {
+			case BGP_VPN_SRV6_DAWRA_04:
+				stream_putc(s, BGP_ATTR_FLAG_OPTIONAL|BGP_ATTR_FLAG_TRANS);
+				stream_putc(s, BGP_ATTR_PREFIX_SID);
+				stream_putc(s, 22);              // tlv len
+				stream_putc(s, BGP_PREFIX_SID_VPN_SID);
+				stream_putw(s, 0x13);            // tlv len
+				stream_putc(s, 0x00);            // reserved
+				stream_putc(s, 0x01);            // sid_type
+				stream_putc(s, 0x00);            // sif_flags
+				stream_put(s, &attr->sid, 16);   // fid_value
+				break;
+			case BGP_VPN_SRV6_DAWRA_05:
+				stream_putc(s, BGP_ATTR_FLAG_OPTIONAL|BGP_ATTR_FLAG_TRANS);
+				stream_putc(s, BGP_ATTR_PREFIX_SID);
+				stream_putc(s, 24);              // tlv len
+				stream_putc(s, BGP_PREFIX_SID_SRV6_L3_SERVICE);
+				stream_putw(s, 21);              // sub-tlv len
+				stream_putc(s, 0);               // reserved
+				stream_put(s, &attr->sid, 16);   // fid_value
+				stream_putc(s, 0);               // sid_flags
+				stream_putw(s, 0xffff);          // endpoint_behaviour
+				stream_putc(s, 0);               // reserved
+				break;
+			default:
+				zlog_err("%s: Invalid SRv6-VPN-Version %d",
+						__func__, version);
+				break;
 		}
 	}
 

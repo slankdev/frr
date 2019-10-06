@@ -1507,6 +1507,13 @@ static int nexthop_active(afi_t afi, struct route_entry *re,
 					"\t%s: Static route unable to resolve",
 					__PRETTY_FUNCTION__);
 			return resolved;
+		} else if (CHECK_FLAG(re->flags, ZEBRA_FLAG_SEG6LOCAL_ROUTE)) {
+			if (IS_ZEBRA_DEBUG_RIB_DETAILED) {
+				zlog_debug(
+					"\t%s: Route Type %s is SEG6LOCAL route",
+					__PRETTY_FUNCTION__, zebra_route_string(re->type));
+			}
+			return 1;
 		} else {
 			if (IS_ZEBRA_DEBUG_RIB_DETAILED) {
 				zlog_debug(
@@ -1933,6 +1940,8 @@ void zebra_nhg_dplane_result(struct zebra_dplane_ctx *ctx)
 	case DPLANE_OP_NEIGH_DELETE:
 	case DPLANE_OP_VTEP_ADD:
 	case DPLANE_OP_VTEP_DELETE:
+	case DPLANE_OP_SRTUNSRC_UPDATE:
+	case DPLANE_OP_SRTUNSRC_DELETE:
 	case DPLANE_OP_NONE:
 		break;
 	}

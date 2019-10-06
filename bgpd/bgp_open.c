@@ -657,6 +657,7 @@ static int bgp_capability_enhe(struct peer *peer, struct capability_header *hdr)
 
 		if (afi != AFI_IP || nh_afi != AFI_IP6
 		    || !(safi == SAFI_UNICAST
+			 || safi == SAFI_MPLS_VPN
 			 || safi == SAFI_LABELED_UNICAST)) {
 			flog_warn(
 				EC_BGP_CAPABILITY_INVALID_DATA,
@@ -1342,6 +1343,7 @@ void bgp_open_capability(struct stream *s, struct peer *peer)
 			    && peer->su.sa.sa_family == AF_INET6
 			    && afi == AFI_IP
 			    && (safi == SAFI_UNICAST
+				|| safi == SAFI_MPLS_VPN
 				|| safi == SAFI_LABELED_UNICAST)) {
 				/* RFC 5549 Extended Next Hop Encoding
 				 */

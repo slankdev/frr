@@ -37,6 +37,7 @@
 
 DEFINE_MTYPE_STATIC(LIB, NEXTHOP, "Nexthop")
 DEFINE_MTYPE_STATIC(LIB, NH_LABEL, "Nexthop label")
+DEFINE_MTYPE_STATIC(LIB, NH_SEGS, "Nexthop segs")
 
 static int _nexthop_labels_cmp(const struct nexthop *nh1,
 			       const struct nexthop *nh2)
@@ -391,6 +392,38 @@ struct nexthop *nexthop_from_blackhole(enum blackhole_type bh_type)
 	return nexthop;
 }
 
+void nexthop_add_seg6local(struct nexthop *nexthop,
+		uint32_t action, const struct seg6local_context *ctx)
+{
+	assert(action != 0);
+	nexthop->seg6local_action = action;
+	memcpy(&nexthop->seg6local_ctx, ctx, sizeof(struct seg6local_context));
+}
+
+void nexthop_del_seg6local(struct nexthop *nexthop)
+{
+	zlog_err("%s:%d:%s: This function isn't implemented",
+			__FILE__, __LINE__, __func__);
+	abort();
+}
+
+void nexthop_add_segs(struct nexthop *nexthop, int mode,
+		size_t num_segs, struct in6_addr *segs)
+{
+	nexthop->nh_seg6_mode = mode;
+	struct seg6_segs *segs_tmp = XCALLOC(MTYPE_NH_SEGS, sizeof(struct seg6_segs));
+	segs_tmp->num_segs = num_segs;
+	memcpy(segs_tmp->segs, segs, num_segs * sizeof(struct in6_addr));
+	nexthop->nh_seg6_segs = segs_tmp;
+}
+
+void nexthop_del_segs(struct nexthop *nexthop)
+{
+	zlog_err("%s:%d:%s: This function isn't implemented",
+			__FILE__, __LINE__, __func__);
+	abort();
+}
+
 /* Update nexthop with label information. */
 void nexthop_add_labels(struct nexthop *nexthop, enum lsp_types_t type,
 			uint8_t num_labels, mpls_label_t *label)
@@ -533,6 +566,18 @@ uint32_t nexthop_hash_quick(const struct nexthop *nexthop)
 			key = jhash_1word(nexthop->nh_label->label[i], key);
 	}
 
+	if (nexthop->seg6local_action != 0) {
+		key = jhash_1word(nexthop->seg6local_action, key);
+		key = jhash(&nexthop->seg6local_ctx, sizeof(nexthop->seg6local_ctx), key);
+	}
+
+	if (nexthop->nh_seg6_segs) {
+		key = jhash_1word(nexthop->nh_seg6_mode, key);
+		key = jhash_1word(nexthop->nh_seg6_segs->num_segs, key);
+		for (size_t i=0; i<nexthop->nh_seg6_segs->num_segs; i++)
+			key = jhash(&nexthop->nh_seg6_segs->segs[i], 16, key);
+	}
+
 	key = jhash_2words(nexthop->ifindex,
 			   CHECK_FLAG(nexthop->flags, NEXTHOP_FLAG_ONLINK),
 			   key);
@@ -581,6 +626,17 @@ void nexthop_copy(struct nexthop *copy, const struct nexthop *nexthop,
 		nexthop_add_labels(copy, nexthop->nh_label_type,
 				   nexthop->nh_label->num_labels,
 				   &nexthop->nh_label->label[0]);
+
+	if (nexthop->nh_seg6_segs)
+		nexthop_add_segs(copy, nexthop->nh_seg6_mode,
+				   nexthop->nh_seg6_segs->num_segs,
+				   &nexthop->nh_seg6_segs->segs[0]);
+
+	if (nexthop->seg6local_action != 0) {
+		nexthop_add_seg6local(copy,
+					nexthop->seg6local_action,
+					&nexthop->seg6local_ctx);
+	}
 }
 
 struct nexthop *nexthop_dup(const struct nexthop *nexthop,

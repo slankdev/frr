@@ -431,6 +431,12 @@ void rfapi_vty_out_vncinfo(struct vty *vty, struct prefix *p,
 		else
 			vty_out(vty, " label=%u",
 				decode_label(&bpi->extra->label[0]));
+
+		if (bpi->extra->num_sids) {
+			char str[128];
+			inet_ntop(AF_INET6, &bpi->extra->sid[0], str, 128);
+			vty_out(vty, " sid=%s", str);
+		}
 	}
 
 	if (!rfapiGetVncLifetime(bpi->attr, &lifetime)) {

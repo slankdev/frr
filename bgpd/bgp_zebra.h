@@ -29,6 +29,14 @@ extern void bgp_zebra_init_tm_connect(struct bgp *bgp);
 extern uint32_t bgp_zebra_tm_get_id(void);
 extern bool bgp_zebra_tm_chunk_obtained(void);
 extern void bgp_zebra_destroy(void);
+
+extern int bgp_srv6_sid_alloc(void);
+extern int bgp_zebra_srv6_sid_set(bool install,
+		const struct prefix_ipv6 *sid, uint32_t action,
+		const struct seg6local_context *ctx,
+		const struct in6_addr *nh6, uint32_t ifindex,
+		uint32_t nexthop_type);
+
 extern int bgp_zebra_get_table_range(uint32_t chunk_size,
 				     uint32_t *start, uint32_t *end);
 extern int bgp_if_update_all(void);

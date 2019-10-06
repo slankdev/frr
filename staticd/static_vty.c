@@ -27,11 +27,13 @@
 #include "table.h"
 #include "srcdest_table.h"
 #include "mpls.h"
+#include "srv6.h"
 
 #include "static_vrf.h"
 #include "static_memory.h"
 #include "static_vty.h"
 #include "static_routes.h"
+#include "static_zebra.h"
 #ifndef VTYSH_EXTRACT_PL
 #include "staticd/static_vty_clippy.c"
 #endif

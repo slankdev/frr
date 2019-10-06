@@ -183,6 +183,8 @@ typedef enum {
 	ZEBRA_MLAG_CLIENT_REGISTER,
 	ZEBRA_MLAG_CLIENT_UNREGISTER,
 	ZEBRA_MLAG_FORWARD_MSG,
+	ZEBRA_SRV6_GET_LOCATOR,
+	ZEBRA_SRV6_ALLOC_SID,
 } zebra_message_types_t;
 
 struct redist_proto {
@@ -280,6 +282,7 @@ struct zclient {
 	int (*mlag_process_up)(void);
 	int (*mlag_process_down)(void);
 	int (*mlag_handle_msg)(struct stream *msg, int len);
+	int (*srv6_sid_alloc)(ZAPI_CALLBACK_ARGS);
 };
 
 /* Zebra API message flag. */
@@ -321,6 +324,14 @@ struct zapi_nexthop {
 	/* MPLS labels for BGP-LU or Segment Routing */
 	uint8_t label_num;
 	mpls_label_t labels[MPLS_MAX_LABELS];
+
+	/* info for seg6(Transit-behaviour) */
+	uint8_t sid_num;
+	struct in6_addr sids[SRV6_MAX_SIDS];
+
+	/* info for seg6local(Endpoint-behaviour) */
+	uint32_t seg6local_action;
+	struct seg6local_context seg6local_ctx;
 
 	struct ethaddr rmac;
 
@@ -381,6 +392,16 @@ struct zapi_route {
  * route entry.  This mainly is used for backup static routes.
  */
 #define ZEBRA_FLAG_RR_USE_DISTANCE    0x40
+/*
+ * This flag tells Zebra that the route is a seg route and should
+ * be treated specially
+ */
+#define ZEBRA_FLAG_SEG6_ROUTE         0x80
+/*
+ * This flag tells Zebra that the route is a seg6local route and should
+ * be treated specially
+ */
+#define ZEBRA_FLAG_SEG6LOCAL_ROUTE   0x100
 
 	uint8_t message;
 
@@ -448,6 +469,30 @@ struct zapi_pw_status {
 	char ifname[IF_NAMESIZE];
 	ifindex_t ifindex;
 	uint32_t status;
+};
+
+struct zapi_seg6local {
+	uint32_t action;
+	uint32_t plen;
+	struct in6_addr sid;
+
+	struct in_addr nh4;
+	struct in6_addr nh6;
+	uint32_t table;
+
+	uint32_t owner;
+};
+
+struct zapi_seg6 {
+	int32_t afi;
+	struct in_addr pref4;
+	struct in6_addr pref6;
+	uint32_t plen;
+	uint32_t table_id;
+
+	uint32_t mode; /* enum seg6_mode_t */
+	uint32_t num_segs;
+	struct in6_addr segs[16];
 };
 
 enum zapi_route_notify_owner {
@@ -683,6 +728,8 @@ extern int tm_get_table_chunk(struct zclient *zclient, uint32_t chunk_size,
 extern int tm_release_table_chunk(struct zclient *zclient, uint32_t start,
 				  uint32_t end);
 
+extern int zclient_srv6_alloc_sid(struct zclient *zclient);
+
 extern int zebra_send_mpls_labels(struct zclient *zclient, int cmd,
 				  struct zapi_labels *zl);
 extern int zapi_labels_encode(struct stream *s, int cmd,
@@ -711,6 +758,8 @@ bool zapi_rule_notify_decode(struct stream *s, uint32_t *seqno,
 bool zapi_ipset_notify_decode(struct stream *s,
 			      uint32_t *unique,
 			     enum zapi_ipset_notify_owner *note);
+extern int zapi_seg6local_encode(struct stream *s, struct zapi_seg6local *api);
+extern int zapi_seg6local_decode(struct stream *s, struct zapi_seg6local *api);
 
 #define ZEBRA_IPSET_NAME_SIZE   32
 

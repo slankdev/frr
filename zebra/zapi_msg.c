@@ -64,6 +64,7 @@
 #include "zebra/zapi_msg.h"
 #include "zebra/zebra_errors.h"
 #include "zebra/zebra_mlag.h"
+#include "zebra/zebra_srv6.h"
 
 /* Encoding helpers -------------------------------------------------------- */
 
@@ -1568,6 +1569,34 @@ static void zread_route_add(ZAPI_HANDLER_ARGS)
 					   &api_nh->labels[0]);
 		}
 
+		if (CHECK_FLAG(api.flags, ZEBRA_FLAG_SEG6_ROUTE)
+		    && api_nh->type != NEXTHOP_TYPE_BLACKHOLE) {
+
+			if (IS_ZEBRA_DEBUG_RECV) {
+				char str[128];
+				inet_ntop(AF_INET6, &api_nh->sids[0], str, 128);
+				zlog_debug(
+					"%s: adding %d sids (1st=%s)",
+					__func__, api_nh->sid_num, str);
+			}
+
+			uint32_t seg6_mode = 1; /* Encap */
+			nexthop_add_segs(nexthop, seg6_mode,
+					api_nh->sid_num, api_nh->sids);
+		}
+
+		if (CHECK_FLAG(api.flags, ZEBRA_FLAG_SEG6LOCAL_ROUTE)
+		    && api_nh->type != NEXTHOP_TYPE_BLACKHOLE) {
+
+			uint32_t action = api_nh->seg6local_action;
+			struct seg6local_context *ctx = &api_nh->seg6local_ctx;
+			if (IS_ZEBRA_DEBUG_RECV)
+				zlog_debug("%s: adding seg6local action %s",
+						__func__, seg6local_action2str(action));
+
+			nexthop_add_seg6local(nexthop, action, ctx);
+		}
+
 		/* Add new nexthop to temporary list */
 		nexthop_group_add_sorted(ng, nexthop);
 	}
@@ -2567,6 +2596,8 @@ void (*const zserv_handlers[])(ZAPI_HANDLER_ARGS) = {
 	[ZEBRA_MLAG_CLIENT_REGISTER] = zebra_mlag_client_register,
 	[ZEBRA_MLAG_CLIENT_UNREGISTER] = zebra_mlag_client_unregister,
 	[ZEBRA_MLAG_FORWARD_MSG] = zebra_mlag_forward_client_msg,
+	[ZEBRA_SRV6_GET_LOCATOR] = zebra_srv6_get_locator,
+	[ZEBRA_SRV6_ALLOC_SID] = zebra_srv6_alloc_sid,
 };
 
 #if defined(HANDLE_ZAPI_FUZZING)

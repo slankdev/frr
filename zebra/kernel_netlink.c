@@ -53,6 +53,7 @@
 #include "zebra/kernel_netlink.h"
 #include "zebra/rt_netlink.h"
 #include "zebra/if_netlink.h"
+#include "zebra/ge_netlink.h"
 #include "zebra/rule_netlink.h"
 #include "zebra/zebra_errors.h"
 
@@ -83,6 +84,8 @@
 #ifndef RTPROT_MROUTED
 #define RTPROT_MROUTED 17
 #endif
+
+#define SOL_NETLINK 270
 
 static const struct message nlmsg_str[] = {{RTM_NEWROUTE, "RTM_NEWROUTE"},
 					   {RTM_DELROUTE, "RTM_DELROUTE"},
@@ -211,6 +214,24 @@ static int netlink_recvbuf(struct nlsock *nl, uint32_t newsize)
 
 	zlog_info("Setting netlink socket receive buffer size: %u -> %u",
 		  oldsize, newsize);
+	return 0;
+}
+
+/* Make socket for Linux ge_netlink interface. */
+static int genetlink_socket(struct nlsock *nl, ns_id_t ns_id)
+{
+	int sock = -1;
+
+	frr_with_privs(&zserv_privs) {
+		sock = ns_socket(AF_NETLINK, SOCK_RAW, NETLINK_GENERIC, ns_id);
+		if (sock < 0) {
+			zlog_err("Can't open %s socket: %s", nl->name,
+				 safe_strerror(errno));
+			return -1;
+		}
+	}
+
+	nl->sock = sock;
 	return 0;
 }
 
@@ -563,6 +584,11 @@ int rta_addattr_l(struct rtattr *rta, unsigned int maxlen, int type,
 	rta->rta_len = NLMSG_ALIGN(rta->rta_len) + RTA_ALIGN(len);
 
 	return 0;
+}
+
+int addattrstrz(struct nlmsghdr *n, int maxlen, int type, const char *str)
+{
+	return addattr_l(n, maxlen, type, str, strlen(str)+1);
 }
 
 int addattr16(struct nlmsghdr *n, unsigned int maxlen, int type, uint16_t data)
@@ -1138,6 +1164,19 @@ void kernel_init(struct zebra_ns *zns)
 		exit(-1);
 	}
 
+	snprintf(zns->genetlink.name, sizeof(zns->genetlink.name),
+		 "genetlink-cmd (NS %u)", zns->ns_id);
+	zns->genetlink.sock = -1;
+	if (genetlink_socket(&zns->genetlink, zns->ns_id) < 0) {
+		zlog_err("Failure to create %s socket",
+			 zns->genetlink.name);
+		exit(-1);
+	}
+
+	zns->genl_family_seg6 = ge_netlink_resolve_family(zns->genetlink.sock, "SEG6");
+	if (zns->genl_family_seg6 < 0)
+		zlog_err("Failure to resolv SEG6 genl family");
+
 	/*
 	 * SOL_NETLINK is not available on all platforms yet
 	 * apparently.  It's in bits/socket.h which I am not
@@ -1191,6 +1230,7 @@ void kernel_init(struct zebra_ns *zns)
 	thread_add_read(zrouter.master, kernel_read, zns,
 			zns->netlink.sock, &zns->t_netlink);
 
+	ge_netlink_init();
 	rt_netlink_init();
 }
 

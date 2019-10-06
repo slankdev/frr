@@ -62,6 +62,7 @@
 #define BGP_PREFIX_SID_LABEL_INDEX     1
 #define BGP_PREFIX_SID_IPV6            2
 #define BGP_PREFIX_SID_ORIGINATOR_SRGB 3
+#define BGP_PREFIX_SID_VPN_SID         4
 #define BGP_PREFIX_SID_SRV6_L3_SERVICE 5
 #define BGP_PREFIX_SID_SRV6_L2_SERVICE 6
 
@@ -197,6 +198,9 @@ struct attr {
 
 	/* MPLS label */
 	mpls_label_t label;
+
+	/* SRv6 L3VPN SID */
+	struct in6_addr sid;
 
 	uint16_t encap_tunneltype;		     /* grr */
 	struct bgp_attr_encap_subtlv *encap_subtlvs; /* rfc5512 */

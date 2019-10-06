@@ -25,6 +25,7 @@
 #include <net/if_arp.h>
 #include <linux/lwtunnel.h>
 #include <linux/mpls_iptunnel.h>
+#include <linux/seg6_iptunnel.h>
 #include <linux/neighbour.h>
 #include <linux/rtnetlink.h>
 #include <linux/nexthop.h>
@@ -38,6 +39,8 @@
 #include "if.h"
 #include "log.h"
 #include "prefix.h"
+#include "plist.h"
+#include "plist_int.h"
 #include "connected.h"
 #include "table.h"
 #include "memory.h"
@@ -68,6 +71,7 @@
 #include "zebra/zebra_mroute.h"
 #include "zebra/zebra_vxlan.h"
 #include "zebra/zebra_errors.h"
+#include "zebra/zebra_srv6.h"
 
 #ifndef AF_MPLS
 #define AF_MPLS 28
@@ -305,6 +309,34 @@ static vrf_id_t vrf_lookup_by_table(uint32_t table_id, ns_id_t ns_id)
 }
 
 /**
+ * @parse_encap_seg6() - Parses encapsulated seg6 attributes
+ * @tb:         Pointer to rtattr to look for nested items in.
+ * @mode:       SEG6_IPTUN_MODE_{0:INLINE,1:ENCAP,2:L2ENCAP}
+ * @segs:       segs array in6_addr format sized 256.
+ *
+ * Return:      Number of segs.
+ */
+static int parse_encap_seg6(struct rtattr *tb,
+		uint32_t *mode, struct in6_addr *segs)
+{
+	struct rtattr *tb_encap[200] = {0};
+	netlink_parse_rtattr_nested(tb_encap, 200, tb);
+
+	struct seg6_iptunnel_encap *seg =
+		(struct seg6_iptunnel_encap*)tb_encap[SEG6_IPTUNNEL_SRH]+1;
+	*mode = seg->mode;
+	struct ipv6_sr_hdr *srh = seg->srh;
+
+	size_t n_segs = srh->hdrlen / 2;
+	for (size_t i=0; i<n_segs; i++) {
+		char str[128];
+		inet_ntop(AF_INET6, &srh->segments[i], str, sizeof(str));
+		memcpy(&segs[i], &srh->segments[i], sizeof(struct in6_addr));
+	}
+	return n_segs;
+}
+
+/**
  * @parse_encap_mpls() - Parses encapsulated mpls attributes
  * @tb:         Pointer to rtattr to look for nested items in.
  * @labels:     Pointer to store labels in.
@@ -340,6 +372,9 @@ parse_nexthop_unicast(ns_id_t ns_id, struct rtmsg *rtm, struct rtattr **tb,
 	struct nexthop nh = {0};
 	mpls_label_t labels[MPLS_MAX_LABELS] = {0};
 	int num_labels = 0;
+	struct in6_addr segs[256];
+	int num_segs = 0;
+	uint32_t seg6_mode;
 
 	vrf_id_t nh_vrf_id = vrf_id;
 	size_t sz = (afi == AFI_IP) ? 4 : 16;
@@ -378,6 +413,10 @@ parse_nexthop_unicast(ns_id_t ns_id, struct rtmsg *rtm, struct rtattr **tb,
 	    && *(uint16_t *)RTA_DATA(tb[RTA_ENCAP_TYPE])
 		       == LWTUNNEL_ENCAP_MPLS) {
 		num_labels = parse_encap_mpls(tb[RTA_ENCAP], labels);
+	} else if (tb[RTA_ENCAP] && tb[RTA_ENCAP_TYPE]
+	    && *(uint16_t *)RTA_DATA(tb[RTA_ENCAP_TYPE])
+		       == LWTUNNEL_ENCAP_SEG6) {
+		num_segs = parse_encap_seg6(tb[RTA_ENCAP], &seg6_mode, segs);
 	}
 
 	if (rtm->rtm_flags & RTNH_F_ONLINK)
@@ -385,6 +424,8 @@ parse_nexthop_unicast(ns_id_t ns_id, struct rtmsg *rtm, struct rtattr **tb,
 
 	if (num_labels)
 		nexthop_add_labels(&nh, ZEBRA_LSP_STATIC, num_labels, labels);
+	else if (num_segs)
+		nexthop_add_segs(&nh, seg6_mode, num_segs, segs);
 
 	return nh;
 }
@@ -402,6 +443,9 @@ static uint8_t parse_multipath_nexthops_unicast(ns_id_t ns_id,
 	/* MPLS labels */
 	mpls_label_t labels[MPLS_MAX_LABELS] = {0};
 	int num_labels = 0;
+	uint32_t num_segs = 0;
+	uint32_t seg6_mode = 0; /* 1:encap, 2:insert */
+	struct in6_addr segs[256];
 	struct rtattr *rtnh_tb[RTA_MAX + 1] = {};
 
 	int len = RTA_PAYLOAD(tb[RTA_MULTIPATH]);
@@ -447,6 +491,11 @@ static uint8_t parse_multipath_nexthops_unicast(ns_id_t ns_id,
 				       == LWTUNNEL_ENCAP_MPLS) {
 				num_labels = parse_encap_mpls(
 					rtnh_tb[RTA_ENCAP], labels);
+			} else if (rtnh_tb[RTA_ENCAP] && rtnh_tb[RTA_ENCAP_TYPE]
+					&& *(uint16_t *)RTA_DATA(rtnh_tb[RTA_ENCAP_TYPE])
+							 == LWTUNNEL_ENCAP_SEG6) {
+				num_segs = parse_encap_seg6(
+					rtnh_tb[RTA_ENCAP], &seg6_mode, segs);
 			}
 		}
 
@@ -472,6 +521,8 @@ static uint8_t parse_multipath_nexthops_unicast(ns_id_t ns_id,
 			if (num_labels)
 				nexthop_add_labels(nh, ZEBRA_LSP_STATIC,
 						   num_labels, labels);
+			else if (num_segs)
+				nexthop_add_segs(nh, seg6_mode, num_segs, segs);
 
 			if (rtnh->rtnh_flags & RTNH_F_ONLINK)
 				SET_FLAG(nh->flags, NEXTHOP_FLAG_ONLINK);
@@ -1111,6 +1162,112 @@ static int build_label_stack(struct mpls_label_stack *nh_label,
 	return num_labels;
 }
 
+static void
+vrf_ip_route_add(struct prefix *prefix, uint32_t table_id)
+{
+	struct route_entry *re = XCALLOC(MTYPE_RE, sizeof(struct route_entry));
+	re->type = ZEBRA_ROUTE_STATIC;
+	re->instance = 0;
+	re->uptime = monotime(NULL);
+	re->vrf_id = VRF_DEFAULT;
+	re->table = RT_TABLE_MAIN;
+
+	struct nexthop_group *ng = NULL;
+	ng = nexthop_group_new();
+
+	ifindex_t ifindex = vrf_lookup_by_table(table_id, 0);
+	struct nexthop *nexthop = NULL;
+	nexthop = nexthop_from_ifindex(ifindex, VRF_DEFAULT);
+	nexthop_group_add_sorted(ng, nexthop);
+
+	int ret = rib_add_multipath(AFI_IP, SAFI_UNICAST, prefix, NULL, re, ng);
+	if (ret < 0)  {
+		zlog_err("%s: can't add RE entry to rib", __func__);
+	}
+}
+
+static void
+vrf_ip_route_del(struct prefix *prefix, uint32_t table_id)
+{
+	struct route_entry *re = XCALLOC(MTYPE_RE, sizeof(struct route_entry));
+	re->type = ZEBRA_ROUTE_STATIC;
+	re->instance = 0;
+	re->uptime = monotime(NULL);
+	re->vrf_id = VRF_DEFAULT;
+	re->table = RT_TABLE_MAIN;
+
+	struct nexthop_group *ng = NULL;
+	ng = nexthop_group_new();
+
+	ifindex_t ifindex = vrf_lookup_by_table(table_id, 0);
+	struct nexthop *nexthop = NULL;
+	nexthop = nexthop_from_ifindex(ifindex, VRF_DEFAULT);
+	nexthop_group_add_sorted(ng, nexthop);
+
+	rib_delete(AFI_IP, SAFI_UNICAST, VRF_DEFAULT, ZEBRA_ROUTE_STATIC,
+			0, 0, prefix, NULL, nexthop, 0, RT_TABLE_MAIN, 20, 1, true);
+}
+
+static uint32_t
+get_pseudo_dt4_vrf_ip(uint32_t table_id)
+{
+	struct srv6 *srv6 = srv6_get_default();
+	if (!srv6 || !srv6->is_enable || !srv6->vrf_ip.plist)
+		return 0;
+
+	for (struct prefix_list_entry *pentry = srv6->vrf_ip.plist->head;
+			 pentry; pentry = pentry->next) {
+		char buf[BUFSIZ];
+		struct prefix *p = &pentry->prefix;
+		inet_ntop(p->family, p->u.val, buf, BUFSIZ);
+
+		in_addr_t val = p->u.prefix4.s_addr;
+		in_addr_t beg = ipv4_network_addr(val, p->prefixlen);
+		in_addr_t end = ipv4_broadcast_addr(val, p->prefixlen);
+		for (in_addr_t i = beg;
+		     ntohl(i) <= ntohl(end);
+				 i = htonl(ntohl(i) + 1)) {
+			char s[128];
+			inet_ntop(AF_INET, &i, s, 128);
+
+			struct prefix key;
+			memset(&key, 0, sizeof(key));
+			key.family = AF_INET;
+			key.prefixlen = 32;
+			key.u.prefix4.s_addr = i;
+			struct route_node *rn = route_node_lookup(srv6->vrf_ip.table, &key);
+			if (!rn) {
+				rn = route_node_get(srv6->vrf_ip.table, &key);
+				rn->info = malloc(sizeof(uint32_t));
+				*(uint32_t*)rn->info = table_id;
+				vrf_ip_route_add(&key, table_id);
+				return i;
+			}
+		}
+	}
+	return 0;
+}
+
+static void
+free_pseudo_dt4_vrf_ip(uint32_t table_id)
+{
+	struct srv6 *srv6 = srv6_get_default();
+	if (!srv6 || !srv6->is_enable || !srv6->vrf_ip.plist)
+		return;
+
+	for (struct route_node *rn = route_top(srv6->vrf_ip.table);
+			 rn; rn = route_next(rn)) {
+		uint32_t tmp_table_id = *(uint32_t*)rn->info;
+		if (tmp_table_id == table_id) {
+			vrf_ip_route_del(&rn->p, table_id);
+			free(rn->info);
+			rn->info = NULL;
+			route_unlock_node(rn);
+			return;
+		}
+	}
+}
+
 /* This function takes a nexthop as argument and adds
  * the appropriate netlink attributes to an existing
  * netlink message.
@@ -1132,7 +1289,6 @@ static void _netlink_route_build_singlepath(const char *routedesc, int bytelen,
 	mpls_lse_t out_lse[MPLS_MAX_LABELS];
 	char label_buf[256];
 	int num_labels = 0;
-
 	assert(nexthop);
 
 	/*
@@ -1166,6 +1322,76 @@ static void _netlink_route_build_singlepath(const char *routedesc, int bytelen,
 		}
 	}
 
+	struct seg6_segs *nh_segs;
+	struct in6_addr out_segs[SRV6_MAX_SIDS];
+	int num_sids = 0;
+	char sid_buf[256];
+
+	nh_segs = nexthop->nh_seg6_segs;
+	for (size_t i = 0; nh_segs && i < nh_segs->num_segs; i++) {
+		if (IS_ZEBRA_DEBUG_KERNEL) {
+			char str[128];
+			sid2str(&nh_segs->segs[i], str, sizeof(str));
+			sprintf(sid_buf, "segs[%zd] %s", i, str);
+		}
+
+		sid_copy(&out_segs[num_labels], &nh_segs->segs[i]);
+		num_sids++;
+	}
+
+	if (num_sids) {
+		struct rtattr *nest;
+		uint16_t encap = LWTUNNEL_ENCAP_SEG6;
+		addattr_l(nlmsg, req_size, RTA_ENCAP_TYPE, &encap, sizeof(uint16_t));
+		nest = addattr_nest(nlmsg, req_size, RTA_ENCAP);
+
+		struct ipv6_sr_hdr *srh = parse_srh(false, num_sids, out_segs);
+		size_t srhlen = (srh->hdrlen + 1) << 3;
+		struct seg6_iptunnel_encap *tuninfo = malloc(sizeof(*tuninfo) + srhlen);
+		memset(tuninfo, 0, sizeof(*tuninfo) + srhlen);
+		memcpy(tuninfo->srh, srh, srhlen);
+		tuninfo->mode = SEG6_IPTUN_MODE_ENCAP;
+		addattr_l(nlmsg, req_size, SEG6_IPTUNNEL_SRH,
+				tuninfo, sizeof(*tuninfo) + srhlen);
+
+		addattr_nest_end(nlmsg, nest);
+	}
+
+	if (nexthop->seg6local_action != 0) {
+		uint32_t action = nexthop->seg6local_action;
+		const struct seg6local_context *ctx = &nexthop->seg6local_ctx;
+
+		if (action != SEG6_LOCAL_ACTION_END
+		 && action != SEG6_LOCAL_ACTION_END_DX4
+		 && action != SEG6_LOCAL_ACTION_END_DT4) {
+			zlog_err("%s: unsupport End behaviour action=%u", __func__, action);
+			return;
+		}
+
+		uint32_t table_redirect_nh4;
+		struct rtattr *nest;
+		uint16_t encap = LWTUNNEL_ENCAP_SEG6_LOCAL;
+		addattr_l(nlmsg, req_size, RTA_ENCAP_TYPE, &encap, sizeof(uint16_t));
+		nest = addattr_nest(nlmsg, req_size, RTA_ENCAP);
+		switch (nexthop->seg6local_action) {
+			case SEG6_LOCAL_ACTION_END:
+				addattr32(nlmsg, req_size, SEG6_LOCAL_ACTION, SEG6_LOCAL_ACTION_END);
+				break;
+			case SEG6_LOCAL_ACTION_END_DX4:
+				addattr32(nlmsg, req_size, SEG6_LOCAL_ACTION, SEG6_LOCAL_ACTION_END_DX4);
+				addattr_l(nlmsg, req_size, SEG6_LOCAL_NH4, &ctx->nh4, sizeof(struct in_addr));
+				break;
+
+			//TODO(slankdev): use pseudo End.DT4 behaviour
+			case SEG6_LOCAL_ACTION_END_DT4:
+				table_redirect_nh4 = get_pseudo_dt4_vrf_ip(ctx->table);
+				addattr32(nlmsg, req_size, SEG6_LOCAL_ACTION, SEG6_LOCAL_ACTION_END_DX4);
+				addattr_l(nlmsg, req_size, SEG6_LOCAL_NH4, &table_redirect_nh4, sizeof(struct in_addr));
+				break;
+		}
+		addattr_nest_end(nlmsg, nest);
+	}
+
 	if (CHECK_FLAG(nexthop->flags, NEXTHOP_FLAG_ONLINK))
 		rtmsg->rtm_flags |= RTNH_F_ONLINK;
 
@@ -1186,8 +1412,8 @@ static void _netlink_route_build_singlepath(const char *routedesc, int bytelen,
 		if (IS_ZEBRA_DEBUG_KERNEL)
 			zlog_debug(
 				" 5549: _netlink_route_build_singlepath() (%s): "
-				"nexthop via %s %s if %u(%u)",
-				routedesc, ipv4_ll_buf, label_buf,
+				"nexthop via %s %s %s if %u(%u)",
+				routedesc, ipv4_ll_buf, label_buf, sid_buf,
 				nexthop->ifindex, nexthop->vrf_id);
 		return;
 	}
@@ -1335,6 +1561,13 @@ static void _netlink_route_build_multipath(const char *routedesc, int bytelen,
 			rta_nest_end(rta, nest);
 			rtnh->rtnh_len += rta->rta_len - len;
 		}
+	}
+
+	struct seg6_segs *nh_segs;
+	nh_segs = nexthop->nh_seg6_segs;
+	if (nh_segs->num_segs) {
+		zlog_debug("%s:%d:%s: this function isn't support yet",
+				__FILE__, __LINE__, __func__);
 	}
 
 	if (CHECK_FLAG(nexthop->flags, NEXTHOP_FLAG_ONLINK))
@@ -1626,6 +1859,17 @@ static int netlink_route_multipath(int cmd, struct zebra_dplane_ctx *ctx)
 	}
 
 	_netlink_route_debug(cmd, p, family, dplane_ctx_get_vrf(ctx), table_id);
+
+	if (cmd == RTM_DELROUTE) {
+		struct nexthop *nexthop = NULL;
+		for (ALL_NEXTHOPS_PTR(dplane_ctx_get_ng(ctx), nexthop)) {
+			if (nexthop->seg6local_action == SEG6_LOCAL_ACTION_END_DT4) {
+				const struct seg6local_context *ctx = &nexthop->seg6local_ctx;
+				free_pseudo_dt4_vrf_ip(ctx->table);
+				break;
+			}
+		}
+	}
 
 	/*
 	 * If we are not updating the route and we have received
@@ -2084,6 +2328,64 @@ static int netlink_nexthop(int cmd, struct zebra_dplane_ctx *ctx)
 				}
 			}
 
+			if (nh->nh_seg6_segs) {
+				struct rtattr *nest;
+				uint16_t encap = LWTUNNEL_ENCAP_SEG6;
+				addattr_l(&req.n, req_size, NHA_ENCAP_TYPE, &encap, sizeof(uint16_t));
+				nest = addattr_nest(&req.n, req_size, NHA_ENCAP | NLA_F_NESTED);
+
+				struct ipv6_sr_hdr *srh = parse_srh(false,
+						nh->nh_seg6_segs->num_segs,
+						nh->nh_seg6_segs->segs);
+				size_t srhlen = (srh->hdrlen + 1) << 3;
+				struct seg6_iptunnel_encap *tuninfo = malloc(sizeof(*tuninfo) + srhlen);
+				memset(tuninfo, 0, sizeof(*tuninfo) + srhlen);
+				memcpy(tuninfo->srh, srh, srhlen);
+
+				tuninfo->mode = SEG6_IPTUN_MODE_ENCAP;
+				addattr_l(&req.n, req_size, SEG6_IPTUNNEL_SRH,
+						tuninfo, sizeof(*tuninfo) + srhlen);
+
+				addattr_nest_end(&req.n, nest);
+			}
+
+			if (nh->seg6local_action != 0) {
+				req.nhm.nh_family = AF_INET6;;
+
+				uint32_t action = nh->seg6local_action;
+				const struct seg6local_context *ctx = &nh->seg6local_ctx;
+
+				if (action != SEG6_LOCAL_ACTION_END
+				 && action != SEG6_LOCAL_ACTION_END_DX4
+				 && action != SEG6_LOCAL_ACTION_END_DT4) {
+					zlog_err("%s: unsupport End behaviour action=%u", __func__, action);
+					goto nexthop_done;
+				}
+
+				uint32_t table_redirect_nh4;
+				struct rtattr *nest;
+				uint16_t encap = LWTUNNEL_ENCAP_SEG6_LOCAL;
+				addattr_l(&req.n, req_size, NHA_ENCAP_TYPE, &encap, sizeof(uint16_t));
+				nest = addattr_nest(&req.n, req_size, NHA_ENCAP | NLA_F_NESTED);
+				switch (action) {
+					case SEG6_LOCAL_ACTION_END:
+						addattr32(&req.n, req_size, SEG6_LOCAL_ACTION, SEG6_LOCAL_ACTION_END);
+						break;
+					case SEG6_LOCAL_ACTION_END_DX4:
+						addattr32(&req.n, req_size, SEG6_LOCAL_ACTION, SEG6_LOCAL_ACTION_END_DX4);
+						addattr_l(&req.n, req_size, SEG6_LOCAL_NH4, &ctx->nh4, sizeof(struct in_addr));
+						break;
+
+					//TODO(slankdev): use pseudo End.DT4 behaviour
+					case SEG6_LOCAL_ACTION_END_DT4:
+						table_redirect_nh4 = get_pseudo_dt4_vrf_ip(ctx->table);
+						addattr32(&req.n, req_size, SEG6_LOCAL_ACTION, SEG6_LOCAL_ACTION_END_DX4);
+						addattr_l(&req.n, req_size, SEG6_LOCAL_NH4, &table_redirect_nh4, sizeof(struct in_addr));
+						break;
+				}
+				addattr_nest_end(&req.n, nest);
+			}
+
 		nexthop_done:
 			if (IS_ZEBRA_DEBUG_KERNEL) {
 				char buf[NEXTHOP_STRLEN];
@@ -2151,6 +2453,8 @@ enum zebra_dplane_result kernel_nexthop_update(struct zebra_dplane_ctx *ctx)
 	case DPLANE_OP_NEIGH_DELETE:
 	case DPLANE_OP_VTEP_ADD:
 	case DPLANE_OP_VTEP_DELETE:
+	case DPLANE_OP_SRTUNSRC_UPDATE:
+	case DPLANE_OP_SRTUNSRC_DELETE:
 	case DPLANE_OP_NONE:
 		flog_err(
 			EC_ZEBRA_NHG_FIB_UPDATE,
