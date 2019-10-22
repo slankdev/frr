@@ -517,6 +517,7 @@ static int vtysh_execute_func(const char *line, int pager)
 		     || saved_node == BGP_IPV6L_NODE
 		     || saved_node == BGP_IPV6M_NODE
 		     || saved_node == BGP_EVPN_NODE
+				 || saved_node == BGP_SRV6_VPNV4_NODE
 		     || saved_node == LDP_IPV4_NODE
 		     || saved_node == LDP_IPV6_NODE)
 		    && (tried == 1)) {
@@ -800,7 +801,8 @@ int vtysh_mark_file(const char *filename)
 			     || prev_node == BGP_IPV6L_NODE
 			     || prev_node == BGP_IPV4M_NODE
 			     || prev_node == BGP_IPV6M_NODE
-			     || prev_node == BGP_EVPN_NODE)
+			     || prev_node == BGP_EVPN_NODE
+			     || prev_node == BGP_SRV6_VPNV4_NODE)
 			    && (tried == 1)) {
 				vty_out(vty, "exit-address-family\n");
 			} else if ((prev_node == BGP_EVPN_VNI_NODE)
@@ -1252,6 +1254,9 @@ static struct cmd_node bgp_evpn_vni_node = {BGP_EVPN_VNI_NODE,
 static struct cmd_node bgp_ipv6l_node = {BGP_IPV6L_NODE,
 					 "%s(config-router-af)# "};
 
+static struct cmd_node bgp_srv6_vpnv4_node = {BGP_SRV6_VPNV4_NODE,
+					 "%s(config-router-af)# "};
+
 static struct cmd_node bgp_vnc_defaults_node = {
 	BGP_VNC_DEFAULTS_NODE, "%s(config-router-vnc-defaults)# "};
 
@@ -1427,6 +1432,16 @@ DEFUNSH(VTYSH_BGPD, address_family_ipv4_vpn, address_family_ipv4_vpn_cmd,
 	"Address Family modifier\n")
 {
 	vty->node = BGP_VPNV4_NODE;
+	return CMD_SUCCESS;
+}
+
+DEFUNSH(VTYSH_BGPD, address_family_ipv4_srv6_vpn, address_family_ipv4_srv6_vpn_cmd,
+	"address-family ipv4 srv6-vpn",
+	"Enter Address Family command mode\n"
+	"Address Family\n"
+	"Address Family modifier\n")
+{
+	vty->node = BGP_SRV6_VPNV4_NODE;
 	return CMD_SUCCESS;
 }
 
@@ -1867,6 +1882,7 @@ static int vtysh_exit(struct vty *vty)
 	case BGP_FLOWSPECV6_NODE:
 	case BGP_VRF_POLICY_NODE:
 	case BGP_EVPN_NODE:
+	case BGP_SRV6_VPNV4_NODE:
 	case BGP_VNC_DEFAULTS_NODE:
 	case BGP_VNC_NVE_GROUP_NODE:
 	case BGP_VNC_L2_GROUP_NODE:
@@ -1925,7 +1941,8 @@ DEFUNSH(VTYSH_BGPD, exit_address_family, exit_address_family_cmd,
 	    || vty->node == BGP_IPV6L_NODE || vty->node == BGP_IPV6M_NODE
 	    || vty->node == BGP_EVPN_NODE
 	    || vty->node == BGP_FLOWSPECV4_NODE
-	    || vty->node == BGP_FLOWSPECV6_NODE)
+	    || vty->node == BGP_FLOWSPECV6_NODE
+	    || vty->node == BGP_SRV6_VPNV4_NODE)
 		vty->node = BGP_NODE;
 	return CMD_SUCCESS;
 }
@@ -3750,6 +3767,7 @@ void vtysh_init_vty(void)
 	install_node(&bgp_vrf_policy_node, NULL);
 	install_node(&bgp_evpn_node, NULL);
 	install_node(&bgp_evpn_vni_node, NULL);
+	install_node(&bgp_srv6_vpnv4_node, NULL);
 	install_node(&bgp_vnc_defaults_node, NULL);
 	install_node(&bgp_vnc_nve_group_node, NULL);
 	install_node(&bgp_vnc_l2_group_node, NULL);
@@ -3848,6 +3866,8 @@ void vtysh_init_vty(void)
 	install_element(BGP_EVPN_NODE, &vtysh_exit_bgpd_cmd);
 	install_element(BGP_EVPN_VNI_NODE, &vtysh_exit_bgpd_cmd);
 	install_element(BGP_EVPN_VNI_NODE, &vtysh_quit_bgpd_cmd);
+	install_element(BGP_SRV6_VPNV4_NODE, &vtysh_exit_bgpd_cmd);
+	install_element(BGP_SRV6_VPNV4_NODE, &vtysh_quit_bgpd_cmd);
 	install_element(BGP_IPV6L_NODE, &vtysh_exit_bgpd_cmd);
 	install_element(BGP_IPV6L_NODE, &vtysh_quit_bgpd_cmd);
 #if defined(ENABLE_BGP_VNC)
@@ -3920,6 +3940,7 @@ void vtysh_init_vty(void)
 	install_element(BGP_VRF_POLICY_NODE, &vtysh_end_all_cmd);
 	install_element(BGP_EVPN_NODE, &vtysh_end_all_cmd);
 	install_element(BGP_EVPN_VNI_NODE, &vtysh_end_all_cmd);
+	install_element(BGP_SRV6_VPNV4_NODE, &vtysh_end_all_cmd);
 	install_element(BGP_VNC_DEFAULTS_NODE, &vtysh_end_all_cmd);
 	install_element(BGP_VNC_NVE_GROUP_NODE, &vtysh_end_all_cmd);
 	install_element(BGP_VNC_L2_GROUP_NODE, &vtysh_end_all_cmd);
@@ -3991,6 +4012,7 @@ void vtysh_init_vty(void)
 	install_element(BGP_NODE, &address_family_evpn_cmd);
 	install_element(BGP_NODE, &address_family_flowspecv4_cmd);
 	install_element(BGP_NODE, &address_family_flowspecv6_cmd);
+	install_element(BGP_NODE, &address_family_ipv4_srv6_vpn_cmd);
 #if defined(HAVE_CUMULUS)
 	install_element(BGP_NODE, &address_family_evpn2_cmd);
 #endif
@@ -4005,6 +4027,7 @@ void vtysh_init_vty(void)
 	install_element(BGP_IPV6L_NODE, &exit_address_family_cmd);
 	install_element(BGP_FLOWSPECV4_NODE, &exit_address_family_cmd);
 	install_element(BGP_FLOWSPECV6_NODE, &exit_address_family_cmd);
+	install_element(BGP_SRV6_VPNV4_NODE, &exit_address_family_cmd);
 
 	install_element(BGP_NODE, &bmp_targets_cmd);
 	install_element(BMP_NODE, &bmp_exit_cmd);

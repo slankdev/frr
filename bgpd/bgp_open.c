@@ -136,6 +136,12 @@ void bgp_capability_vty_out(struct vty *vty, struct peer *peer, bool use_json,
 						"capabilityErrorMultiProtocolSafi",
 						"MPLS-labeled VPN");
 					break;
+				case SAFI_SRV6_VPN:
+					json_object_string_add(
+						json_cap,
+						"capabilityErrorMultiProtocolSafi",
+						"SRv6-based VPN");
+					break;
 				case SAFI_ENCAP:
 					json_object_string_add(
 						json_cap,
@@ -191,6 +197,9 @@ void bgp_capability_vty_out(struct vty *vty, struct peer *peer, bool use_json,
 					break;
 				case SAFI_MPLS_VPN:
 					vty_out(vty, "SAFI MPLS-labeled VPN");
+					break;
+				case SAFI_SRV6_VPN:
+					vty_out(vty, "SAFI SRv6-based VPN");
 					break;
 				case SAFI_ENCAP:
 					vty_out(vty, "SAFI ENCAP");
@@ -1197,6 +1206,7 @@ int bgp_open_option_parse(struct peer *peer, uint8_t length, int *mp_capability)
 		    && !peer->afc_nego[AFI_IP][SAFI_MULTICAST]
 		    && !peer->afc_nego[AFI_IP][SAFI_LABELED_UNICAST]
 		    && !peer->afc_nego[AFI_IP][SAFI_MPLS_VPN]
+		    && !peer->afc_nego[AFI_IP][SAFI_SRV6_VPN]
 		    && !peer->afc_nego[AFI_IP][SAFI_ENCAP]
 		    && !peer->afc_nego[AFI_IP][SAFI_FLOWSPEC]
 		    && !peer->afc_nego[AFI_IP6][SAFI_UNICAST]

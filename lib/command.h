@@ -161,6 +161,7 @@ enum node_type {
 	VRRP_NODE,		 /* VRRP node */
 	BMP_NODE,		/* BMP config under router bgp */
 	SRV6_NODE,   /* SRv6 config */
+	BGP_SRV6_VPNV4_NODE,		 /* BGP SRv6-VPN PE exchange. */
 	NODE_TYPE_MAX, /* maximum */
 };
 

@@ -58,5 +58,8 @@ extern void zebra_seg6local_delete(ZAPI_HANDLER_ARGS);
 extern void zebra_seg6_add(ZAPI_HANDLER_ARGS);
 extern void zebra_seg6_delete(ZAPI_HANDLER_ARGS);
 
+extern void zebra_srv6_sid_route_add(ZAPI_HANDLER_ARGS);
+extern void zebra_srv6_sid_route_delete(ZAPI_HANDLER_ARGS);
+
 
 #endif /* _QUAGGA_ZEBRA_SEG6_H */

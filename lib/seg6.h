@@ -52,6 +52,23 @@ seg6_mode2str(enum seg6_mode_t mode)
 	}
 }
 
+static inline bool sid_same(
+		const struct in6_addr *a,
+		const struct in6_addr *b)
+{ return memcmp(a, b, sizeof(struct in6_addr)) == 0; }
+
+static inline bool sid_diff(
+		const struct in6_addr *a,
+		const struct in6_addr *b)
+{ return !sid_same(a, b); }
+
+static inline bool sid_zero(
+		const struct in6_addr *a)
+{
+	uint8_t zero[16] = {0};
+	return sid_same(a, (const struct in6_addr*)zero);
+}
+
 #ifdef __cplusplus
 }
 #endif

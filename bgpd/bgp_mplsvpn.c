@@ -698,6 +698,7 @@ void vpn_leak_from_vrf_update(struct bgp *bgp_vpn,	    /* to */
 				   bgp_vrf->name, debugmsg);
 		return;
 	}
+	zlog_debug("%s: not skipped", __func__);
 
 	bgp_attr_dup(&static_attr, path_vrf->attr); /* shallow copy */
 
@@ -1405,8 +1406,9 @@ void vpn_leak_to_vrf_update_all(struct bgp *bgp_vrf, /* to */
 			     bpi = bpi->next) {
 
 				if (bpi->extra
-				    && bpi->extra->bgp_orig == bgp_vrf)
+				    && bpi->extra->bgp_orig == bgp_vrf) {
 					continue;
+				}
 
 				vpn_leak_to_vrf_update_onevrf(bgp_vrf, bgp_vpn,
 							      bpi);

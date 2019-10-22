@@ -78,6 +78,9 @@ enum bgp_show_adj_route_type {
  */
 #define BGP_MAX_LABELS 2
 
+/* Maximum number of sids we can process or send with a prefix. */
+#define BGP_MAX_SIDS 6
+
 /* Error codes for handling NLRI */
 #define BGP_NLRI_PARSE_OK 0
 #define BGP_NLRI_PARSE_ERROR_PREFIX_OVERFLOW -1
@@ -113,6 +116,10 @@ struct bgp_path_info_extra {
 	/* MPLS label(s) - VNI(s) for EVPN-VxLAN  */
 	mpls_label_t label[BGP_MAX_LABELS];
 	uint32_t num_labels;
+
+	/* SRv6 SID(s) for SRv6-VPN */
+	struct in6_addr sid[BGP_MAX_SIDS];
+	uint32_t num_sids;
 
 #if ENABLE_BGP_VNC
 	union {
@@ -287,6 +294,9 @@ struct bgp_static {
 
 	/* MPLS label.  */
 	mpls_label_t label;
+
+	/* SRv6 sid.  */
+	struct in6_addr sid;
 
 	/* EVPN */
 	struct eth_segment_id *eth_s_id;

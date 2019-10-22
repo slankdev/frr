@@ -57,6 +57,7 @@
 #include "bgpd/bgp_filter.h"
 #include "bgpd/bgp_fsm.h"
 #include "bgpd/bgp_mplsvpn.h"
+#include "bgpd/bgp_srv6vpn.h"
 #include "bgpd/bgp_nexthop.h"
 #include "bgpd/bgp_damp.h"
 #include "bgpd/bgp_advertise.h"
@@ -125,7 +126,7 @@ struct bgp_node *bgp_afi_node_get(struct bgp_table *table, afi_t afi,
 		return NULL;
 
 	if ((safi == SAFI_MPLS_VPN) || (safi == SAFI_ENCAP)
-	    || (safi == SAFI_EVPN)) {
+	    || (safi == SAFI_EVPN) || (safi == SAFI_SRV6_VPN)) {
 		prn = bgp_node_get(table, (struct prefix *)prd);
 
 		if (!bgp_node_has_bgp_path_info_data(prn))
@@ -139,7 +140,7 @@ struct bgp_node *bgp_afi_node_get(struct bgp_table *table, afi_t afi,
 	rn = bgp_node_get(table, p);
 
 	if ((safi == SAFI_MPLS_VPN) || (safi == SAFI_ENCAP)
-	    || (safi == SAFI_EVPN))
+	    || (safi == SAFI_EVPN) || (safi == SAFI_SRV6_VPN))
 		rn->prn = prn;
 
 	return rn;
@@ -156,7 +157,7 @@ struct bgp_node *bgp_afi_node_lookup(struct bgp_table *table, afi_t afi,
 		return NULL;
 
 	if ((safi == SAFI_MPLS_VPN) || (safi == SAFI_ENCAP)
-	    || (safi == SAFI_EVPN)) {
+	    || (safi == SAFI_EVPN) || (safi == SAFI_MPLS_VPN)) {
 		prn = bgp_node_lookup(table, (struct prefix *)prd);
 		if (!prn)
 			return NULL;
@@ -1496,7 +1497,8 @@ int subgroup_announce_check(struct bgp_node *rn, struct bgp_path_info *pi,
 					       : pi->attr;
 
 #if ENABLE_BGP_VNC
-	if (((afi == AFI_IP) || (afi == AFI_IP6)) && (safi == SAFI_MPLS_VPN)
+	if (((afi == AFI_IP) || (afi == AFI_IP6))
+			&& ((safi == SAFI_MPLS_VPN) || (safi == SAFI_SRV6_VPN))
 	    && ((pi->type == ZEBRA_ROUTE_BGP_DIRECT)
 		|| (pi->type == ZEBRA_ROUTE_BGP_DIRECT_EXT))) {
 
@@ -1513,7 +1515,7 @@ int subgroup_announce_check(struct bgp_node *rn, struct bgp_path_info *pi,
 #endif
 
 	if (((afi == AFI_IP) || (afi == AFI_IP6))
-	    && ((safi == SAFI_MPLS_VPN) || (safi == SAFI_UNICAST))
+	    && ((safi == SAFI_MPLS_VPN) || (safi == SAFI_UNICAST) || (safi == SAFI_SRV6_VPN))
 	    && (pi->type == ZEBRA_ROUTE_BGP)
 	    && (pi->sub_type == BGP_ROUTE_IMPORTED)) {
 
@@ -3042,6 +3044,7 @@ int bgp_update(struct peer *peer, struct prefix *p, uint32_t addpath_id,
 	int connected = 0;
 	int do_loop_check = 1;
 	int has_valid_label = 0;
+	int has_valid_sid = 0;
 #if ENABLE_BGP_VNC
 	int vnc_implicit_withdraw = 0;
 #endif
@@ -3058,6 +3061,9 @@ int bgp_update(struct peer *peer, struct prefix *p, uint32_t addpath_id,
 		has_valid_label = (num_labels > 0) ? 1 : 0;
 	else
 		has_valid_label = bgp_is_valid_label(label);
+
+	if (safi == SAFI_SRV6_VPN && !sid_zero(&attr->sid))
+		has_valid_sid = 1;
 
 	/* When peer's soft reconfiguration enabled.  Record input packet in
 	   Adj-RIBs-In.  */
@@ -3389,6 +3395,15 @@ int bgp_update(struct peer *peer, struct prefix *p, uint32_t addpath_id,
 				bgp_set_valid_label(&extra->label[0]);
 		}
 
+		/* Update SRv6 SID */
+		if (has_valid_sid) {
+			extra = bgp_path_info_extra_get(pi);
+			if (sid_diff(&extra->sid[0], &attr->sid)) {
+				memcpy(&extra->sid[0], &attr->sid, 16);
+				extra->num_sids = 1;
+			}
+		}
+
 #if ENABLE_BGP_VNC
 		if ((afi == AFI_IP || afi == AFI_IP6)
 		    && (safi == SAFI_UNICAST)) {
@@ -3510,11 +3525,17 @@ int bgp_update(struct peer *peer, struct prefix *p, uint32_t addpath_id,
 			|| bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
 
 			vpn_leak_from_vrf_update(bgp_get_default(), bgp, pi);
+			srv6vpn_leak_from_vrf_update(bgp_get_default(), bgp, pi);
 		}
 		if ((SAFI_MPLS_VPN == safi)
 		    && (bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
 
 			vpn_leak_to_vrf_update(bgp, pi);
+		}
+		if ((SAFI_SRV6_VPN == safi)
+		    && (bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
+
+			srv6vpn_leak_to_vrf_update(bgp, pi);
 		}
 
 #if ENABLE_BGP_VNC
@@ -3560,6 +3581,15 @@ int bgp_update(struct peer *peer, struct prefix *p, uint32_t addpath_id,
 		}
 		if (!(afi == AFI_L2VPN && safi == SAFI_EVPN))
 			bgp_set_valid_label(&extra->label[0]);
+	}
+
+	/* Update SRv6 SID */
+	if (safi == SAFI_SRV6_VPN) {
+		extra = bgp_path_info_extra_get(new);
+		if (sid_zero(extra->sid)) {
+			memcpy(&extra->sid, &attr->sid, 16);
+			extra->num_sids = 1;
+		}
 	}
 
 	/* Update Overlay Index */
@@ -3642,11 +3672,17 @@ int bgp_update(struct peer *peer, struct prefix *p, uint32_t addpath_id,
 	    && (bgp->inst_type == BGP_INSTANCE_TYPE_VRF
 		|| bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
 		vpn_leak_from_vrf_update(bgp_get_default(), bgp, new);
+		srv6vpn_leak_from_vrf_update(bgp_get_default(), bgp, new);
 	}
 	if ((SAFI_MPLS_VPN == safi)
 	    && (bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
 
 		vpn_leak_to_vrf_update(bgp, new);
+	}
+	if ((SAFI_SRV6_VPN == safi)
+	    && (bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
+
+		srv6vpn_leak_to_vrf_update(bgp, new);
 	}
 #if ENABLE_BGP_VNC
 	if (SAFI_MPLS_VPN == safi) {
@@ -3693,11 +3729,17 @@ filtered:
 			|| bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
 
 			vpn_leak_from_vrf_withdraw(bgp_get_default(), bgp, pi);
+			srv6vpn_leak_from_vrf_withdraw(bgp_get_default(), bgp, pi);
 		}
 		if ((SAFI_MPLS_VPN == safi)
 		    && (bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
 
 			vpn_leak_to_vrf_withdraw(bgp, pi);
+		}
+		if ((SAFI_SRV6_VPN == safi)
+		    && (bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
+
+			srv6vpn_leak_to_vrf_withdraw(bgp, pi);
 		}
 
 		bgp_rib_remove(rn, pi, peer, afi, safi);
@@ -3794,11 +3836,17 @@ int bgp_withdraw(struct peer *peer, struct prefix *p, uint32_t addpath_id,
 		    && (bgp->inst_type == BGP_INSTANCE_TYPE_VRF
 			|| bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
 			vpn_leak_from_vrf_withdraw(bgp_get_default(), bgp, pi);
+			srv6vpn_leak_from_vrf_withdraw(bgp_get_default(), bgp, pi);
 		}
 		if ((SAFI_MPLS_VPN == safi)
 		    && (bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
 
 			vpn_leak_to_vrf_withdraw(bgp, pi);
+		}
+		if ((SAFI_SRV6_VPN == safi)
+		    && (bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
+
+			srv6vpn_leak_to_vrf_withdraw(bgp, pi);
 		}
 	} else if (bgp_debug_update(peer, p, NULL, 1)) {
 		bgp_debug_rdpfxpath2str(afi, safi, prd, p, label, num_labels,
@@ -3963,7 +4011,7 @@ void bgp_soft_reconfig_in(struct peer *peer, afi_t afi, safi_t safi)
 		return;
 
 	if ((safi != SAFI_MPLS_VPN) && (safi != SAFI_ENCAP)
-	    && (safi != SAFI_EVPN))
+	    && (safi != SAFI_EVPN) && (safi != SAFI_SRV6_VPN))
 		bgp_soft_reconfig_table(peer, afi, safi, NULL, NULL);
 	else
 		for (rn = bgp_table_top(peer->bgp->rib[afi][safi]); rn;
@@ -4025,10 +4073,16 @@ static wq_item_status bgp_clear_route_node(struct work_queue *wq, void *data)
 				bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
 				vpn_leak_from_vrf_withdraw(bgp_get_default(),
 							   bgp, pi);
+				srv6vpn_leak_from_vrf_withdraw(bgp_get_default(),
+							   bgp, pi);
 			}
 			if (SAFI_MPLS_VPN == safi &&
 			    bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT) {
 				vpn_leak_to_vrf_withdraw(bgp, pi);
+			}
+			if (SAFI_SRV6_VPN == safi &&
+			    bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT) {
+				srv6vpn_leak_to_vrf_withdraw(bgp, pi);
 			}
 
 			bgp_rib_remove(rn, pi, peer, afi, safi);
@@ -4195,7 +4249,7 @@ void bgp_clear_route(struct peer *peer, afi_t afi, safi_t safi)
 	if (!peer->clear_node_queue->thread)
 		peer_lock(peer);
 
-	if (safi != SAFI_MPLS_VPN && safi != SAFI_ENCAP && safi != SAFI_EVPN)
+	if (safi != SAFI_MPLS_VPN && safi != SAFI_ENCAP && safi != SAFI_EVPN && safi != SAFI_SRV6_VPN)
 		bgp_clear_route_table(peer, afi, safi, NULL);
 	else
 		for (rn = bgp_table_top(peer->bgp->rib[afi][safi]); rn;
@@ -4260,6 +4314,30 @@ void bgp_clear_stale_route(struct peer *peer, afi_t afi, safi_t safi)
 	struct bgp_table *table;
 
 	if (safi == SAFI_MPLS_VPN) {
+		for (rn = bgp_table_top(peer->bgp->rib[afi][safi]); rn;
+		     rn = bgp_route_next(rn)) {
+			struct bgp_node *rm;
+
+			/* look for neighbor in tables */
+			table = bgp_node_get_bgp_table_info(rn);
+			if (!table)
+				continue;
+
+			for (rm = bgp_table_top(table); rm;
+			     rm = bgp_route_next(rm))
+				for (pi = bgp_node_get_bgp_path_info(rm); pi;
+				     pi = pi->next) {
+					if (pi->peer != peer)
+						continue;
+					if (!CHECK_FLAG(pi->flags,
+							BGP_PATH_STALE))
+						break;
+
+					bgp_rib_remove(rm, pi, peer, afi, safi);
+					break;
+				}
+		}
+	} else if (safi == SAFI_SRV6_VPN) {
 		for (rn = bgp_table_top(peer->bgp->rib[afi][safi]); rn;
 		     rn = bgp_route_next(rn)) {
 			struct bgp_node *rm;
@@ -4367,6 +4445,17 @@ void bgp_cleanup_routes(struct bgp *bgp)
 		if (afi != AFI_L2VPN) {
 			safi_t safi;
 			safi = SAFI_MPLS_VPN;
+			for (rn = bgp_table_top(bgp->rib[afi][safi]); rn;
+			     rn = bgp_route_next(rn)) {
+				table = bgp_node_get_bgp_table_info(rn);
+				if (table != NULL) {
+					bgp_cleanup_table(bgp, table, safi);
+					bgp_table_finish(&table);
+					bgp_node_set_bgp_table_info(rn, NULL);
+					bgp_unlock_node(rn);
+				}
+			}
+			safi = SAFI_SRV6_VPN;
 			for (rn = bgp_table_top(bgp->rib[afi][safi]); rn;
 			     rn = bgp_route_next(rn)) {
 				table = bgp_node_get_bgp_table_info(rn);
@@ -4763,6 +4852,8 @@ void bgp_static_update(struct bgp *bgp, struct prefix *p,
 					   == BGP_INSTANCE_TYPE_DEFAULT)) {
 				vpn_leak_from_vrf_update(bgp_get_default(), bgp,
 							 pi);
+				srv6vpn_leak_from_vrf_update(bgp_get_default(), bgp,
+							 pi);
 			}
 
 			bgp_unlock_node(rn);
@@ -4816,6 +4907,7 @@ void bgp_static_update(struct bgp *bgp, struct prefix *p,
 	    && (bgp->inst_type == BGP_INSTANCE_TYPE_VRF
 		|| bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
 		vpn_leak_from_vrf_update(bgp_get_default(), bgp, new);
+		srv6vpn_leak_from_vrf_update(bgp_get_default(), bgp, new);
 	}
 
 	/* Unintern original. */
@@ -4842,6 +4934,7 @@ void bgp_static_withdraw(struct bgp *bgp, struct prefix *p, afi_t afi,
 		    && (bgp->inst_type == BGP_INSTANCE_TYPE_VRF
 			|| bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
 			vpn_leak_from_vrf_withdraw(bgp_get_default(), bgp, pi);
+			srv6vpn_leak_from_vrf_withdraw(bgp_get_default(), bgp, pi);
 		}
 		bgp_aggregate_decrement(bgp, p, pi, afi, safi);
 		bgp_unlink_nexthop(pi);
@@ -4854,7 +4947,7 @@ void bgp_static_withdraw(struct bgp *bgp, struct prefix *p, afi_t afi,
 }
 
 /*
- * Used for SAFI_MPLS_VPN and SAFI_ENCAP
+ * Used for SAFI_MPLS_VPN and SAFI_ENCAP and SAFI_SRV6_VPN
  */
 static void bgp_static_withdraw_safi(struct bgp *bgp, struct prefix *p,
 				     afi_t afi, safi_t safi,
@@ -4881,6 +4974,10 @@ static void bgp_static_withdraw_safi(struct bgp *bgp, struct prefix *p,
 		if (SAFI_MPLS_VPN == safi
 		    && bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT) {
 			vpn_leak_to_vrf_withdraw(bgp, pi);
+		}
+		if (SAFI_SRV6_VPN == safi
+		    && bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT) {
+			srv6vpn_leak_to_vrf_withdraw(bgp, pi);
 		}
 		bgp_aggregate_decrement(bgp, p, pi, afi, safi);
 		bgp_path_info_delete(rn, pi);
@@ -4920,7 +5017,7 @@ static void bgp_static_update_safi(struct bgp *bgp, struct prefix *p,
 	attr.flag |= ATTR_FLAG_BIT(BGP_ATTR_MULTI_EXIT_DISC);
 
 	if ((safi == SAFI_EVPN) || (safi == SAFI_MPLS_VPN)
-	    || (safi == SAFI_ENCAP)) {
+	    || (safi == SAFI_ENCAP) || (safi == SAFI_SRV6_VPN)) {
 		if (afi == AFI_IP) {
 			attr.mp_nexthop_global_in = bgp_static->igpnexthop;
 			attr.mp_nexthop_len = IPV4_MAX_BYTELEN;
@@ -5015,6 +5112,10 @@ static void bgp_static_update_safi(struct bgp *bgp, struct prefix *p,
 			    && bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT) {
 				vpn_leak_to_vrf_update(bgp, pi);
 			}
+			if (SAFI_SRV6_VPN == safi
+			    && bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT) {
+				srv6vpn_leak_to_vrf_update(bgp, pi);
+			}
 #if ENABLE_BGP_VNC
 			rfapiProcessUpdate(pi->peer, NULL, p, &bgp_static->prd,
 					   pi->attr, afi, safi, pi->type,
@@ -5054,6 +5155,10 @@ static void bgp_static_update_safi(struct bgp *bgp, struct prefix *p,
 	if (SAFI_MPLS_VPN == safi
 	    && bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT) {
 		vpn_leak_to_vrf_update(bgp, new);
+	}
+	if (SAFI_SRV6_VPN == safi
+	    && bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT) {
+		srv6vpn_leak_to_vrf_update(bgp, new);
 	}
 #if ENABLE_BGP_VNC
 	rfapiProcessUpdate(new->peer, NULL, p, &bgp_static->prd, new->attr, afi,
@@ -5218,7 +5323,7 @@ void bgp_static_add(struct bgp *bgp)
 				continue;
 
 			if ((safi == SAFI_MPLS_VPN) || (safi == SAFI_ENCAP)
-			    || (safi == SAFI_EVPN)) {
+			    || (safi == SAFI_EVPN) || (safi == SAFI_SRV6_VPN)) {
 				table = bgp_node_get_bgp_table_info(rn);
 
 				for (rm = bgp_table_top(table); rm;
@@ -5257,7 +5362,7 @@ void bgp_static_delete(struct bgp *bgp)
 				continue;
 
 			if ((safi == SAFI_MPLS_VPN) || (safi == SAFI_ENCAP)
-			    || (safi == SAFI_EVPN)) {
+			    || (safi == SAFI_EVPN) || (safi == SAFI_SRV6_VPN)) {
 				table = bgp_node_get_bgp_table_info(rn);
 
 				for (rm = bgp_table_top(table); rm;
@@ -5303,7 +5408,7 @@ void bgp_static_redo_import_check(struct bgp *bgp)
 				continue;
 
 			if ((safi == SAFI_MPLS_VPN) || (safi == SAFI_ENCAP)
-			    || (safi == SAFI_EVPN)) {
+			    || (safi == SAFI_EVPN) || (safi == SAFI_SRV6_VPN)) {
 				table = bgp_node_get_bgp_table_info(rn);
 
 				for (rm = bgp_table_top(table); rm;
@@ -6827,6 +6932,8 @@ void bgp_redistribute_add(struct bgp *bgp, struct prefix *p,
 
 					vpn_leak_from_vrf_update(
 						bgp_get_default(), bgp, bpi);
+					srv6vpn_leak_from_vrf_update(
+						bgp_get_default(), bgp, bpi);
 				}
 				return;
 			}
@@ -6845,6 +6952,7 @@ void bgp_redistribute_add(struct bgp *bgp, struct prefix *p,
 		    || (bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
 
 			vpn_leak_from_vrf_update(bgp_get_default(), bgp, new);
+			srv6vpn_leak_from_vrf_update(bgp_get_default(), bgp, new);
 		}
 	}
 
@@ -6877,6 +6985,8 @@ void bgp_redistribute_delete(struct bgp *bgp, struct prefix *p, uint8_t type,
 
 				vpn_leak_from_vrf_withdraw(bgp_get_default(),
 							   bgp, pi);
+				srv6vpn_leak_from_vrf_withdraw(bgp_get_default(),
+							   bgp, pi);
 			}
 			bgp_aggregate_decrement(bgp, p, pi, afi, SAFI_UNICAST);
 			bgp_path_info_delete(rn, pi);
@@ -6907,6 +7017,8 @@ void bgp_redistribute_withdraw(struct bgp *bgp, afi_t afi, int type,
 			    || (bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
 
 				vpn_leak_from_vrf_withdraw(bgp_get_default(),
+							   bgp, pi);
+				srv6vpn_leak_from_vrf_withdraw(bgp_get_default(),
 							   bgp, pi);
 			}
 			bgp_aggregate_decrement(bgp, &rn->p, pi, afi,
@@ -7154,14 +7266,14 @@ void route_vty_out(struct vty *vty, struct prefix *p,
 	/*
 	 * For ENCAP and EVPN routes, nexthop address family is not
 	 * neccessarily the same as the prefix address family.
-	 * Both SAFI_MPLS_VPN and SAFI_ENCAP use the MP nexthop field
+	 * Both SAFI_MPLS_VPN and SAFI_ENCAP and SAFI_SRV6_VPN use the MP nexthop field
 	 * EVPN routes are also exchanged with a MP nexthop. Currently,
 	 * this
 	 * is only IPv4, the value will be present in either
 	 * attr->nexthop or
 	 * attr->mp_nexthop_global_in
 	 */
-	if ((safi == SAFI_ENCAP) || (safi == SAFI_MPLS_VPN)) {
+	if ((safi == SAFI_ENCAP) || (safi == SAFI_MPLS_VPN) || (safi == SAFI_SRV6_VPN)) {
 		char buf[BUFSIZ];
 		char nexthop[128];
 		int af = NEXTHOP_FAMILY(attr->mp_nexthop_len);
@@ -7243,7 +7355,7 @@ void route_vty_out(struct vty *vty, struct prefix *p,
 		if (json_paths) {
 			json_nexthop_global = json_object_new_object();
 
-			if ((safi == SAFI_MPLS_VPN) || (safi == SAFI_EVPN))
+			if ((safi == SAFI_MPLS_VPN) || (safi == SAFI_EVPN) || (safi == SAFI_SRV6_VPN))
 				json_object_string_add(
 					json_nexthop_global,
 					nexthop_fqdn ? "fqdn" : "ip",
@@ -7501,6 +7613,21 @@ void route_vty_out(struct vty *vty, struct prefix *p,
 			vty_out(vty, "%s\n", attr->ecommunity->str);
 		}
 
+		if (safi == SAFI_SRV6_VPN) {
+			char s0[128];
+			inet_ntop(AF_INET6, &path->attr->sid, s0, sizeof(s0));
+			char *s = ecommunity_ecom2str(
+					path->attr->ecommunity,
+						ECOMMUNITY_FORMAT_ROUTE_MAP, 0);
+
+			vty_out(vty, "    ");
+			vty_out(vty, "SID=%s", s0);
+			vty_out(vty, " EC{%s}", s);
+			vty_out(vty, "\n");
+
+			XFREE(MTYPE_ECOMMUNITY_STR, s);
+		}
+
 #if ENABLE_BGP_VNC
 		/* prints an additional line, indented, with VNC info, if
 		 * present */
@@ -7544,7 +7671,7 @@ void route_vty_out_tmp(struct vty *vty, struct prefix *p, struct attr *attr,
 		if (use_json) {
 			if (p->family == AF_INET
 			    && (safi == SAFI_MPLS_VPN || safi == SAFI_ENCAP
-				|| safi == SAFI_EVPN
+				|| safi == SAFI_EVPN || safi == SAFI_SRV6_VPN
 				|| !BGP_ATTR_NEXTHOP_AFI_IP6(attr))) {
 				if (safi == SAFI_MPLS_VPN || safi == SAFI_ENCAP
 				    || safi == SAFI_EVPN)
@@ -7607,10 +7734,10 @@ void route_vty_out_tmp(struct vty *vty, struct prefix *p, struct attr *attr,
 		} else {
 			if (p->family == AF_INET
 			    && (safi == SAFI_MPLS_VPN || safi == SAFI_ENCAP
-				|| safi == SAFI_EVPN
+				|| safi == SAFI_EVPN || safi == SAFI_SRV6_VPN
 				|| !BGP_ATTR_NEXTHOP_AFI_IP6(attr))) {
 				if (safi == SAFI_MPLS_VPN || safi == SAFI_ENCAP
-				    || safi == SAFI_EVPN)
+				    || safi == SAFI_EVPN || safi == SAFI_SRV6_VPN)
 					vty_out(vty, "%-16s",
 						inet_ntoa(
 							attr->mp_nexthop_global_in));
@@ -7696,11 +7823,11 @@ void route_vty_out_tag(struct vty *vty, struct prefix *p,
 	attr = path->attr;
 	if (attr) {
 		if (((p->family == AF_INET)
-		     && ((safi == SAFI_MPLS_VPN || safi == SAFI_ENCAP)))
+		     && ((safi == SAFI_MPLS_VPN || safi == SAFI_ENCAP || safi == SAFI_SRV6_VPN)))
 		    || (safi == SAFI_EVPN && !BGP_ATTR_NEXTHOP_AFI_IP6(attr))
 		    || (!BGP_ATTR_NEXTHOP_AFI_IP6(attr))) {
 			if (safi == SAFI_MPLS_VPN || safi == SAFI_ENCAP
-			    || safi == SAFI_EVPN) {
+			    || safi == SAFI_EVPN || safi == SAFI_SRV6_VPN) {
 				if (json)
 					json_object_string_add(
 						json_out, "mpNexthopGlobalIn",
@@ -7720,7 +7847,7 @@ void route_vty_out_tag(struct vty *vty, struct prefix *p,
 						inet_ntoa(attr->nexthop));
 			}
 		} else if (((p->family == AF_INET6)
-			    && ((safi == SAFI_MPLS_VPN || safi == SAFI_ENCAP)))
+			    && ((safi == SAFI_MPLS_VPN || safi == SAFI_ENCAP || safi == SAFI_SRV6_VPN)))
 			   || (safi == SAFI_EVPN
 			       && BGP_ATTR_NEXTHOP_AFI_IP6(attr))
 			   || (BGP_ATTR_NEXTHOP_AFI_IP6(attr))) {
@@ -8365,10 +8492,10 @@ void route_vty_out_detail(struct vty *vty, struct bgp *bgp,
 		if ((bn->p.family == AF_INET || bn->p.family == AF_ETHERNET
 		     || bn->p.family == AF_EVPN)
 		    && (safi == SAFI_MPLS_VPN || safi == SAFI_ENCAP
-			|| safi == SAFI_EVPN
+			|| safi == SAFI_EVPN || safi == SAFI_SRV6_VPN
 			|| !BGP_ATTR_NEXTHOP_AFI_IP6(attr))) {
 			if (safi == SAFI_MPLS_VPN || safi == SAFI_ENCAP
-			    || safi == SAFI_EVPN) {
+			    || safi == SAFI_EVPN || safi == SAFI_SRV6_VPN) {
 				if (json_paths)
 					json_object_string_add(
 						json_nexthop_global,
@@ -8969,6 +9096,19 @@ void route_vty_out_detail(struct vty *vty, struct bgp *bgp,
 				vty_out(vty, "      Remote label: %d\n", label);
 		}
 
+		/* Remote SID */
+		if (path->extra && path->extra->num_sids > 0
+		    && safi != SAFI_EVPN) {
+
+			char s0[128];
+			inet_ntop(AF_INET6, &path->extra->sid, s0, sizeof(s0));
+
+			if (json_paths)
+				json_object_string_add(json_path, "remoteSid", s0);
+			else
+				vty_out(vty, "      Remote SID: %s\n", s0);
+		}
+
 		/* Label Index */
 		if (attr->label_index != BGP_INVALID_LABEL_INDEX) {
 			if (json_paths)
@@ -9537,6 +9677,10 @@ static int bgp_show(struct vty *vty, struct bgp *bgp, afi_t afi, safi_t safi,
 		return bgp_show_table_rd(vty, bgp, safi, table, NULL, type,
 					 output_arg, use_json);
 	}
+	if (safi == SAFI_SRV6_VPN) {
+		return bgp_show_table_rd(vty, bgp, safi, table, NULL, type,
+					 output_arg, use_json);
+	}
 
 	if (safi == SAFI_FLOWSPEC && type == bgp_show_type_detail) {
 		return bgp_show_table_flowspec(vty, bgp, afi, table, type,
@@ -9647,11 +9791,11 @@ void route_vty_out_detail_header(struct vty *vty, struct bgp *bgp,
 						   buf3, sizeof(buf3)));
 		else
 			vty_out(vty, "BGP routing table entry for %s%s%s/%d\n",
-				((safi == SAFI_MPLS_VPN || safi == SAFI_ENCAP)
+				((safi == SAFI_MPLS_VPN || safi == SAFI_ENCAP || safi == SAFI_SRV6_VPN)
 					 ? prefix_rd2str(prd, buf1,
 							 sizeof(buf1))
 					 : ""),
-				safi == SAFI_MPLS_VPN ? ":" : "",
+				(safi == SAFI_MPLS_VPN || safi == SAFI_SRV6_VPN) ? ":" : "",
 				inet_ntop(p->family, &p->u.prefix, buf2,
 					  INET6_ADDRSTRLEN),
 				p->prefixlen);
@@ -9824,7 +9968,8 @@ static int bgp_show_route_in_table(struct vty *vty, struct bgp *bgp,
 		json_paths = json_object_new_array();
 	}
 
-	if (safi == SAFI_MPLS_VPN || safi == SAFI_ENCAP || safi == SAFI_EVPN) {
+	if (safi == SAFI_MPLS_VPN || safi == SAFI_ENCAP ||
+			safi == SAFI_EVPN || safi == SAFI_SRV6_VPN) {
 		for (rn = bgp_table_top(rib); rn; rn = bgp_route_next(rn)) {
 			if (prd && memcmp(rn->p.u.val, prd->val, 8) != 0)
 				continue;
@@ -10736,6 +10881,17 @@ static int bgp_table_stats_walker(struct thread *t)
 
 	for (rn = top; rn; rn = bgp_route_next(rn)) {
 		if (ts->table->safi == SAFI_MPLS_VPN) {
+			struct bgp_table *table;
+
+			table = bgp_node_get_bgp_table_info(rn);
+			if (!table)
+				continue;
+
+			top = bgp_table_top(table);
+			for (nrn = bgp_table_top(table); nrn;
+			     nrn = bgp_route_next(nrn))
+				bgp_table_stats_rn(nrn, top, ts, space);
+		} else if (ts->table->safi == SAFI_SRV6_VPN) {
 			struct bgp_table *table;
 
 			table = bgp_node_get_bgp_table_info(rn);
@@ -11786,6 +11942,39 @@ DEFUN (show_bgp_afi_vpn_rd_route,
 			      0, BGP_PATH_SHOW_ALL, use_json(argc, argv));
 }
 
+DEFUN (show_bgp_afi_srv6vpn_rd_route,
+       show_bgp_afi_srv6vpn_rd_route_cmd,
+       "show bgp "BGP_AFI_CMD_STR" srv6-vpn rd ASN:NN_OR_IP-ADDRESS:NN <A.B.C.D/M|X:X::X:X/M> [json]",
+       SHOW_STR
+       BGP_STR
+       BGP_AFI_HELP_STR
+       "Address Family modifier\n"
+       "Display information for a route distinguisher\n"
+       "Route Distinguisher\n"
+       "Network in the BGP routing table to display\n"
+       "Network in the BGP routing table to display\n"
+       JSON_STR)
+{
+	int ret;
+	struct prefix_rd prd;
+	afi_t afi = AFI_MAX;
+	int idx = 0;
+
+	if (!argv_find_and_parse_afi(argv, argc, &idx, &afi)) {
+		vty_out(vty, "%% Malformed Address Family\n");
+		return CMD_WARNING;
+	}
+
+	ret = str2prefix_rd(argv[5]->arg, &prd);
+	if (!ret) {
+		vty_out(vty, "%% Malformed Route Distinguisher\n");
+		return CMD_WARNING;
+	}
+
+	return bgp_show_route(vty, NULL, argv[6]->arg, afi, SAFI_SRV6_VPN, &prd,
+			      0, BGP_PATH_SHOW_ALL, use_json(argc, argv));
+}
+
 static struct bgp_distance *bgp_distance_new(void)
 {
 	return XCALLOC(MTYPE_BGP_DISTANCE, sizeof(struct bgp_distance));
@@ -12202,7 +12391,7 @@ static int bgp_clear_damp_route(struct vty *vty, const char *view_name,
 	match.family = afi2family(afi);
 
 	if ((safi == SAFI_MPLS_VPN) || (safi == SAFI_ENCAP)
-	    || (safi == SAFI_EVPN)) {
+	    || (safi == SAFI_EVPN) || (safi == SAFI_SRV6_VPN)) {
 		for (rn = bgp_table_top(bgp->rib[AFI_IP][safi]); rn;
 		     rn = bgp_route_next(rn)) {
 			if (prd && memcmp(rn->p.u.val, prd->val, 8) != 0)
@@ -12391,6 +12580,15 @@ static void bgp_config_write_network_vpn(struct vty *vty, struct bgp *bgp,
 			if (safi == SAFI_MPLS_VPN)
 				vty_out(vty, " label %u", label);
 
+			struct in6_addr *sid;
+			sid = &bgp_static->sid;
+
+			if (safi == SAFI_SRV6_VPN) {
+				char str[128];
+				inet_ntop(AF_INET6, sid, str, sizeof(str));
+				vty_out(vty, " sid %s", str);
+			}
+
 			if (bgp_static->rmap.name)
 				vty_out(vty, " route-map %s",
 					bgp_static->rmap.name);
@@ -12485,7 +12683,7 @@ void bgp_config_write_network(struct vty *vty, struct bgp *bgp, afi_t afi,
 	struct bgp_aggregate *bgp_aggregate;
 	char buf[SU_ADDRSTRLEN];
 
-	if ((safi == SAFI_MPLS_VPN) || (safi == SAFI_ENCAP)) {
+	if ((safi == SAFI_MPLS_VPN) || (safi == SAFI_ENCAP) || (safi == SAFI_SRV6_VPN)) {
 		bgp_config_write_network_vpn(vty, bgp, afi, safi);
 		return;
 	}
@@ -12636,6 +12834,7 @@ void bgp_route_init(void)
 	install_element(VIEW_NODE, &show_ip_bgp_vpn_all_route_prefix_cmd);
 #endif /* KEEP_OLD_VPN_COMMANDS */
 	install_element(VIEW_NODE, &show_bgp_afi_vpn_rd_route_cmd);
+	install_element(VIEW_NODE, &show_bgp_afi_srv6vpn_rd_route_cmd);
 	install_element(VIEW_NODE,
 			&show_ip_bgp_l2vpn_evpn_all_route_prefix_cmd);
 

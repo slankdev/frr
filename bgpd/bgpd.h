@@ -92,6 +92,7 @@ enum bgp_af_index {
 	BGP_AF_IPV6_LBL_UNICAST,
 	BGP_AF_IPV4_FLOWSPEC,
 	BGP_AF_IPV6_FLOWSPEC,
+	BGP_AF_IPV4_SRV6_VPN,
 	BGP_AF_MAX
 };
 
@@ -183,6 +184,58 @@ typedef enum {
 	BGP_VPN_POLICY_DIR_TOVPN = 1,
 	BGP_VPN_POLICY_DIR_MAX = 2
 } vpn_policy_direction_t;
+
+inline static const char*
+vpn_policy_direction2str(vpn_policy_direction_t dir)
+{
+	switch (dir) {
+		case BGP_VPN_POLICY_DIR_FROMVPN: return "FROMVPN";
+		case BGP_VPN_POLICY_DIR_TOVPN: return "TOVPN";
+		case BGP_VPN_POLICY_DIR_MAX:
+		default:
+			 abort();
+	}
+}
+
+typedef enum {
+	BGP_SRV6VPN_POLICY_DIR_FROMVPN = 0,
+	BGP_SRV6VPN_POLICY_DIR_TOVPN = 1,
+	BGP_SRV6VPN_POLICY_DIR_MAX = 2
+} srv6vpn_policy_direction_t;
+
+inline static const char*
+srv6vpn_policy_direction2str(srv6vpn_policy_direction_t dir)
+{
+	switch (dir) {
+		case BGP_SRV6VPN_POLICY_DIR_FROMVPN: return "FROMVPN";
+		case BGP_SRV6VPN_POLICY_DIR_TOVPN: return "TOVPN";
+		case BGP_SRV6VPN_POLICY_DIR_MAX:
+		default:
+			 abort();
+	}
+}
+
+struct srv6vpn_policy {
+	struct bgp *bgp; /* parent */
+	afi_t afi;
+	struct ecommunity *rtlist[BGP_SRV6VPN_POLICY_DIR_MAX];
+	struct ecommunity *import_redirect_rtlist;
+	char *rmap_name[BGP_SRV6VPN_POLICY_DIR_MAX];
+	struct route_map *rmap[BGP_SRV6VPN_POLICY_DIR_MAX];
+
+  struct in6_addr tovpn_sid;
+	struct in6_addr tovpn_zebra_vrf_sid_last_sent;
+
+	struct prefix_rd tovpn_rd;
+	struct prefix tovpn_nexthop; /* unset => set to 0 */
+	uint32_t flags;
+#define BGP_SRV6VPN_POLICY_TOVPN_SID_AUTO          (1 << 0)
+#define BGP_SRV6VPN_POLICY_TOVPN_RD_SET            (1 << 1)
+#define BGP_SRV6VPN_POLICY_TOVPN_NEXTHOP_SET       (1 << 2)
+
+	struct list *import_vrf;
+	struct list *export_vrf;
+};
 
 struct vpn_policy {
 	struct bgp *bgp; /* parent */
@@ -380,6 +433,9 @@ struct bgp {
 #define BGP_CONFIG_VRF_TO_VRF_IMPORT			(1 << 7)
 #define BGP_CONFIG_VRF_TO_VRF_EXPORT			(1 << 8)
 
+#define BGP_CONFIG_VRF_TO_SRV6VPN_EXPORT		(1 << 9)
+#define BGP_CONFIG_SRV6VPN_TO_VRF_IMPORT		(1 << 10)
+
 	/* BGP per AF peer count */
 	uint32_t af_peer_count[AFI_MAX][SAFI_MAX];
 
@@ -560,6 +616,7 @@ struct bgp {
 	struct bgp_rmap adv_cmd_rmap[AFI_MAX][SAFI_MAX];
 
 	struct vpn_policy vpn_policy[AFI_MAX];
+	struct srv6vpn_policy srv6vpn_policy[AFI_MAX];
 
 	struct bgp_pbr_config *bgp_pbr_cfg;
 
@@ -1785,6 +1842,8 @@ static inline int afindex(afi_t afi, safi_t safi)
 			break;
 		case SAFI_FLOWSPEC:
 			return BGP_AF_IPV4_FLOWSPEC;
+		case SAFI_SRV6_VPN:
+			return BGP_AF_IPV4_SRV6_VPN;
 		default:
 			return BGP_AF_MAX;
 			break;
@@ -1844,6 +1903,7 @@ static inline int peer_afi_active_nego(const struct peer *peer, afi_t afi)
 	    || peer->afc_nego[afi][SAFI_MULTICAST]
 	    || peer->afc_nego[afi][SAFI_LABELED_UNICAST]
 	    || peer->afc_nego[afi][SAFI_MPLS_VPN]
+	    || peer->afc_nego[afi][SAFI_SRV6_VPN]
 	    || peer->afc_nego[afi][SAFI_ENCAP]
 	    || peer->afc_nego[afi][SAFI_FLOWSPEC]
 	    || peer->afc_nego[afi][SAFI_EVPN])
@@ -1860,6 +1920,7 @@ static inline int peer_group_af_configured(struct peer_group *group)
 	    || peer->afc[AFI_IP][SAFI_LABELED_UNICAST]
 	    || peer->afc[AFI_IP][SAFI_FLOWSPEC]
 	    || peer->afc[AFI_IP][SAFI_MPLS_VPN] || peer->afc[AFI_IP][SAFI_ENCAP]
+	    || peer->afc[AFI_IP][SAFI_SRV6_VPN]
 	    || peer->afc[AFI_IP6][SAFI_UNICAST]
 	    || peer->afc[AFI_IP6][SAFI_MULTICAST]
 	    || peer->afc[AFI_IP6][SAFI_LABELED_UNICAST]

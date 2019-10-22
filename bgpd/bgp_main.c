@@ -47,6 +47,7 @@
 #include "bgpd/bgp_attr.h"
 #include "bgpd/bgp_route.h"
 #include "bgpd/bgp_mplsvpn.h"
+#include "bgpd/bgp_srv6vpn.h"
 #include "bgpd/bgp_aspath.h"
 #include "bgpd/bgp_dump.h"
 #include "bgpd/bgp_route.h"
@@ -303,6 +304,10 @@ static int bgp_vrf_enable(struct vrf *vrf)
 				    bgp_get_default(), bgp);
 		vpn_leak_postchange(BGP_VPN_POLICY_DIR_FROMVPN, AFI_IP6,
 				    bgp_get_default(), bgp);
+
+		srv6vpn_leak_zebra_vrf_sid_update(bgp, AFI_IP);
+		srv6vpn_leak_postchange(BGP_VPN_POLICY_DIR_TOVPN, AFI_IP, bgp_get_default(), bgp);
+		srv6vpn_leak_postchange(BGP_VPN_POLICY_DIR_FROMVPN, AFI_IP, bgp_get_default(), bgp);
 	}
 
 	return 0;
@@ -322,6 +327,10 @@ static int bgp_vrf_disable(struct vrf *vrf)
 	bgp = bgp_lookup_by_name(vrf->name);
 	if (bgp) {
 
+		srv6vpn_leak_zebra_vrf_sid_withdraw(bgp, AFI_IP);
+		srv6vpn_leak_prechange(BGP_VPN_POLICY_DIR_TOVPN, AFI_IP, bgp_get_default(), bgp);
+		srv6vpn_leak_prechange(BGP_VPN_POLICY_DIR_FROMVPN, AFI_IP, bgp_get_default(), bgp);
+
 		vpn_leak_zebra_vrf_label_withdraw(bgp, AFI_IP);
 		vpn_leak_zebra_vrf_label_withdraw(bgp, AFI_IP6);
 		vpn_leak_prechange(BGP_VPN_POLICY_DIR_TOVPN, AFI_IP,
@@ -332,6 +341,14 @@ static int bgp_vrf_disable(struct vrf *vrf)
 				   bgp_get_default(), bgp);
 		vpn_leak_prechange(BGP_VPN_POLICY_DIR_FROMVPN, AFI_IP6,
 				   bgp_get_default(), bgp);
+
+		srv6vpn_leak_zebra_vrf_sid_withdraw(bgp, AFI_IP);
+		srv6vpn_leak_prechange(BGP_VPN_POLICY_DIR_TOVPN, AFI_IP, bgp_get_default(), bgp);
+		srv6vpn_leak_prechange(BGP_VPN_POLICY_DIR_FROMVPN, AFI_IP, bgp_get_default(), bgp);
+
+		srv6vpn_leak_zebra_vrf_sid_withdraw(bgp, AFI_IP);
+		srv6vpn_leak_prechange(BGP_SRV6VPN_POLICY_DIR_TOVPN, AFI_IP, bgp_get_default(), bgp);
+		srv6vpn_leak_prechange(BGP_SRV6VPN_POLICY_DIR_FROMVPN, AFI_IP, bgp_get_default(), bgp);
 
 		old_vrf_id = bgp->vrf_id;
 		bgp_handle_socket(bgp, vrf, VRF_UNKNOWN, false);

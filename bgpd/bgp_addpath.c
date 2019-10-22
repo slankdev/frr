@@ -215,7 +215,7 @@ static void bgp_addpath_flush_type(struct bgp *bgp, afi_t afi, safi_t safi,
 
 	for (rn = bgp_table_top(bgp->rib[afi][safi]); rn;
 	     rn = bgp_route_next(rn)) {
-		if (safi == SAFI_MPLS_VPN) {
+		if (safi == SAFI_MPLS_VPN) { // TODO(slankdev): ????
 			struct bgp_table *table;
 
 			table = bgp_node_get_bgp_table_info(rn);
@@ -281,7 +281,7 @@ static void bgp_addpath_populate_type(struct bgp *bgp, afi_t afi, safi_t safi,
 	     rn = bgp_route_next(rn)) {
 		struct bgp_path_info *bi;
 
-		if (safi == SAFI_MPLS_VPN) {
+		if (safi == SAFI_MPLS_VPN) { // TODO(slankdev): ????
 			struct bgp_table *table;
 
 			table = bgp_node_get_bgp_table_info(rn);

@@ -61,6 +61,7 @@ static int zapi_seg6_decode(struct stream *s, struct zapi_seg6 *api)
 	stream_get(&api->pref4, s, 4);
 	stream_get(&api->pref6, s, 16);
 	STREAM_GETL(s, api->plen);
+	STREAM_GETL(s, api->table_id);
 
 	STREAM_GETL(s, api->mode);
 	STREAM_GETL(s, api->num_segs);
@@ -88,10 +89,51 @@ static struct ipv6_sr_hdr *parse_srh(bool encap,
   return srh;
 }
 
+static void adddel_in6_route(
+    struct in6_addr *pref, uint32_t plen,
+		struct in6_addr *nh6, bool install)
+{
+	int fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
+  if (fd < 0)
+    exit(1);
+
+	struct {
+    struct nlmsghdr  n;
+    struct rtmsg r;
+    char buf[4096];
+  } req = {
+    .n.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg)),
+    .n.nlmsg_flags = NLM_F_REQUEST | NLM_F_CREATE | NLM_F_EXCL | NLM_F_ACK,
+    .n.nlmsg_type = install ? RTM_NEWROUTE : RTM_DELROUTE,
+    .r.rtm_family = AF_INET6,
+    .r.rtm_dst_len = plen,
+    .r.rtm_src_len = 0,
+    .r.rtm_tos = 0,
+    .r.rtm_table = RT_TABLE_MAIN,
+    .r.rtm_protocol = 0x03,
+    .r.rtm_scope = 0xfd,
+    .r.rtm_type = RTN_UNICAST,
+    .r.rtm_flags = 0,
+  };
+
+  /* set RTA_DST */
+  addattr_l(&req.n, sizeof(req), RTA_DST, pref, sizeof(struct in6_addr));
+  req.r.rtm_dst_len = plen;
+
+  /* set RTA_GATEWAY */
+  addattr_l(&req.n, sizeof(req), RTA_GATEWAY, nh6, sizeof(struct in6_addr));
+
+  /* talk with netlink-bus */
+  /* hexdump(stdout, &req.n, req.n.nlmsg_len); */
+  if (nl_talk(fd, &req.n, NULL, 0) < 0)
+    exit(1);
+	close(fd);
+}
+
 static void adddel_in4_seg6_route(
     struct in_addr *pref, uint32_t plen, uint32_t mode,
 		uint32_t num_segs, const struct in6_addr *segs,
-    uint32_t oif_idx,
+    uint32_t oif_idx, uint32_t table_id,
 		bool install)
 {
   int fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
@@ -110,7 +152,7 @@ static void adddel_in4_seg6_route(
     .r.rtm_dst_len = plen,
     .r.rtm_src_len = 0,
     .r.rtm_tos = 0,
-    .r.rtm_table = RT_TABLE_MAIN,
+    .r.rtm_table = table_id,
     .r.rtm_protocol = 0x03,
     .r.rtm_scope = 0xfd,
     .r.rtm_type = RTN_UNICAST,
@@ -439,7 +481,7 @@ void zebra_seg6_add(ZAPI_HANDLER_ARGS)
 	const uint32_t dummy_oif = 2;
 	frr_with_privs(&zserv_privs) {
 		adddel_in4_seg6_route(&api.pref4, api.plen, api.mode,
-				api.num_segs, api.segs, dummy_oif, true);
+				api.num_segs, api.segs, dummy_oif, api.table_id, true);
 	}
 }
 
@@ -457,7 +499,39 @@ void zebra_seg6_delete(ZAPI_HANDLER_ARGS)
 	const uint32_t dummy_oif = 2;
 	frr_with_privs(&zserv_privs) {
 		adddel_in4_seg6_route(&api.pref4, api.plen, api.mode,
-				api.num_segs, api.segs, dummy_oif, false);
+				api.num_segs, api.segs, dummy_oif, api.table_id, false);
+	}
+}
+
+void zebra_srv6_sid_route_add(ZAPI_HANDLER_ARGS)
+{
+	struct zapi_seg6local api;
+	memset(&api, 0, sizeof(api));
+	zapi_seg6local_decode(msg, &api);
+
+#if 0
+	/* DUMP API structure */
+	zapi_seg6_dump(stdout, &api);
+#endif
+
+	frr_with_privs(&zserv_privs) {
+		adddel_in6_route(&api.sid, api.plen, &api.nh6, true);
+	}
+}
+
+void zebra_srv6_sid_route_delete(ZAPI_HANDLER_ARGS)
+{
+	struct zapi_seg6local api;
+	memset(&api, 0, sizeof(api));
+	zapi_seg6local_decode(msg, &api);
+
+#if 0
+	/* DUMP API structure */
+	zapi_seg6_dump(stdout, &api);
+#endif
+
+	frr_with_privs(&zserv_privs) {
+		adddel_in6_route(&api.sid, api.plen, &api.nh6, false);
 	}
 }
 

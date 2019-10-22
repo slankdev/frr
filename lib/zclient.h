@@ -182,6 +182,8 @@ typedef enum {
 	ZEBRA_SEG6LOCAL_DELETE,
 	ZEBRA_SEG6_ADD,
 	ZEBRA_SEG6_DELETE,
+	ZEBRA_SRV6_SID_ROUTE_ADD,
+	ZEBRA_SRV6_SID_ROUTE_DELETE,
 } zebra_message_types_t;
 
 struct redist_proto {
@@ -466,6 +468,7 @@ struct zapi_seg6 {
 	struct in_addr pref4;
 	struct in6_addr pref6;
 	uint32_t plen;
+	uint32_t table_id;
 
 	uint32_t mode; /* enum seg6_mode_t */
 	uint32_t num_segs;
@@ -483,6 +486,7 @@ zapi_seg6_dump(FILE *fp, const struct zapi_seg6 *api)
 	fprintf(fp, "zapi_seg6.pref4: %s\n", pref4_);
 	fprintf(fp, "zapi_seg6.pref6: %s\n", pref6_);
 	fprintf(fp, "zapi_seg6.plen: %u\n", api->plen);
+	fprintf(fp, "zapi_seg6.tableid: %u\n", api->table_id);
 
 	fprintf(fp, "zapi_seg6.plen: %s(%u)\n", seg6_mode2str(api->mode), api->mode);
 	fprintf(fp, "zapi_seg6.num_segs: %u\n", api->num_segs);
@@ -584,6 +588,9 @@ extern void redist_del_instance(struct redist_proto *, unsigned short);
 extern void zclient_send_vrf_label(struct zclient *zclient, vrf_id_t vrf_id,
 				   afi_t afi, mpls_label_t label,
 				   enum lsp_types_t ltype);
+
+extern void zclient_send_vrf_seg6local_dx4(struct zclient *zclient,
+					 afi_t afi, struct in6_addr *sid, uint32_t vrf_table_id);
 
 extern void zclient_send_reg_requests(struct zclient *, vrf_id_t);
 extern void zclient_send_dereg_requests(struct zclient *, vrf_id_t);

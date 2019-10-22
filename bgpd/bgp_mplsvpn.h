@@ -208,18 +208,26 @@ static inline void vpn_leak_postchange(vpn_policy_direction_t direction,
 				       afi_t afi, struct bgp *bgp_vpn,
 				       struct bgp *bgp_vrf)
 {
+	zlog_debug("%s:%d dir=%s afi=%u bgp_vpn=%s bgp_vrf=%s", __func__, __LINE__,
+			vpn_policy_direction2str(direction), afi,
+			bgp_vpn->name, bgp_vrf->name);
+
 	/* Detect when default bgp instance is not (yet) defined by config */
 	if (!bgp_vpn)
 		return;
 
-	if (direction == BGP_VPN_POLICY_DIR_FROMVPN)
+	if (direction == BGP_VPN_POLICY_DIR_FROMVPN) {
 		vpn_leak_to_vrf_update_all(bgp_vrf, bgp_vpn, afi);
+	}
 	if (direction == BGP_VPN_POLICY_DIR_TOVPN) {
 
 		if (bgp_vrf->vpn_policy[afi].tovpn_label !=
 			bgp_vrf->vpn_policy[afi]
 			       .tovpn_zebra_vrf_label_last_sent) {
 			vpn_leak_zebra_vrf_label_update(bgp_vrf, afi);
+			zlog_debug("%s:%d MPLS alpha", __func__, __LINE__);
+		} else {
+			zlog_debug("%s:%d MPLS beta", __func__, __LINE__);
 		}
 
 		vpn_leak_from_vrf_update_all(bgp_vpn, bgp_vrf, afi);

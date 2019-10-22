@@ -351,6 +351,7 @@ extern void static_zebra_route_adddel_seg6(
 	api.afi = AF_INET;
 	memcpy(&api.pref4, prefix, sizeof(struct in_addr));
 	api.plen = plen;
+	api.table_id = 0;
 	api.mode = mode;
 	api.num_segs = num_segs;
 	for (size_t i=0; i<api.num_segs; i++)
@@ -371,6 +372,7 @@ extern void static_zebra_route_adddel_seg6(
 	stream_write(s, &api.pref4, sizeof(struct in_addr));
 	stream_write(s, &api.pref6, sizeof(struct in6_addr));
 	stream_putl(s, api.plen);
+	stream_putl(s, api.table_id);
 	stream_putl(s, api.mode);
 	stream_putl(s, api.num_segs);
 	for (size_t i=0; i<api.num_segs; i++)

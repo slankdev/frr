@@ -2556,6 +2556,8 @@ void (*zserv_handlers[])(ZAPI_HANDLER_ARGS) = {
 	[ZEBRA_SEG6LOCAL_DELETE] = zebra_seg6local_delete,
 	[ZEBRA_SEG6_ADD] = zebra_seg6_add,
 	[ZEBRA_SEG6_DELETE] = zebra_seg6_delete,
+	[ZEBRA_SRV6_SID_ROUTE_ADD] = zebra_srv6_sid_route_add,
+	[ZEBRA_SRV6_SID_ROUTE_DELETE] = zebra_srv6_sid_route_delete,
 };
 
 #if defined(HANDLE_ZAPI_FUZZING)

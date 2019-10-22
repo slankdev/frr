@@ -123,6 +123,7 @@ struct bgp_debug_filter {
 #define BGP_DEBUG_VPN_LEAK_TO_VRF     0x02
 #define BGP_DEBUG_VPN_LEAK_RMAP_EVENT 0x04
 #define BGP_DEBUG_VPN_LEAK_LABEL      0x08
+#define BGP_DEBUG_VPN_ADV_PREFIX_SID  0x10
 #define BGP_DEBUG_FLOWSPEC            0x01
 #define BGP_DEBUG_LABELPOOL           0x01
 #define BGP_DEBUG_PBR                 0x01

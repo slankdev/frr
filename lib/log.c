@@ -604,7 +604,7 @@ void zlog_backtrace_sigsafe(int priority, void *program_counter)
 		fb.pos = buf;
 		if (unw_is_signal_frame(&cursor))
 			bprintfrr(&fb, "    ---- signal ----\n");
-		bprintfrr(&fb, "%-30s %16lx %16lx", name, (long)ip, (long)sp);
+		bprintfrr(&fb, "%-50s %16lx %16lx", name, (long)ip, (long)sp);
 		if (dladdr((void *)ip, &dlinfo))
 			bprintfrr(&fb, " %s (mapped at %p)",
 				  dlinfo.dli_fname, dlinfo.dli_fbase);
@@ -717,11 +717,11 @@ void zlog_backtrace(int priority)
 				buf, (long)off);
 
 		if (dladdr((void *)ip, &dlinfo))
-			zlog(priority, "%-30s %16lx %16lx %s (mapped at %p)",
+			zlog(priority, "%-50s %16lx %16lx %s (mapped at %p)",
 				name, (long)ip, (long)sp,
 				dlinfo.dli_fname, dlinfo.dli_fbase);
 		else
-			zlog(priority, "%-30s %16lx %16lx",
+			zlog(priority, "%-50s %16lx %16lx",
 				name, (long)ip, (long)sp);
 	}
 #elif defined(HAVE_GLIBC_BACKTRACE)

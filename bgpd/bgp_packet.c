@@ -55,6 +55,7 @@
 #include "bgpd/bgp_lcommunity.h"
 #include "bgpd/bgp_network.h"
 #include "bgpd/bgp_mplsvpn.h"
+#include "bgpd/bgp_srv6vpn.h"
 #include "bgpd/bgp_evpn.h"
 #include "bgpd/bgp_advertise.h"
 #include "bgpd/bgp_vty.h"
@@ -314,6 +315,9 @@ int bgp_nlri_parse(struct peer *peer, struct attr *attr,
 	case SAFI_MPLS_VPN:
 		return bgp_nlri_parse_vpn(peer, mp_withdraw ? NULL : attr,
 					  packet);
+	case SAFI_SRV6_VPN:
+		return bgp_nlri_parse_srv6vpn(peer, mp_withdraw ? NULL : attr,
+					  packet);
 	case SAFI_EVPN:
 		return bgp_nlri_parse_evpn(peer, attr, packet, mp_withdraw);
 	case SAFI_FLOWSPEC:
@@ -368,6 +372,7 @@ static void bgp_write_proceed_actions(struct peer *peer)
 			    && peer->synctime
 			    && !CHECK_FLAG(peer->af_sflags[afi][safi],
 					   PEER_STATUS_EOR_SEND)
+					&& safi != SAFI_SRV6_VPN
 			    && safi != SAFI_MPLS_VPN) {
 				BGP_TIMER_ON(peer->t_generate_updgrp_packets,
 					     bgp_generate_updgrp_packets, 0);
@@ -1333,6 +1338,7 @@ static int bgp_open_receive(struct peer *peer, bgp_size_t size)
 	    || peer->afc_nego[AFI_IP][SAFI_LABELED_UNICAST]
 	    || peer->afc_nego[AFI_IP][SAFI_MULTICAST]
 	    || peer->afc_nego[AFI_IP][SAFI_MPLS_VPN]
+	    || peer->afc_nego[AFI_IP][SAFI_SRV6_VPN]
 	    || peer->afc_nego[AFI_IP][SAFI_ENCAP]) {
 		if (!peer->nexthop.v4.s_addr) {
 #if defined(HAVE_CUMULUS)

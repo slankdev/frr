@@ -65,6 +65,7 @@
 #include "bgpd/bgp_nexthop.h"
 #include "bgpd/bgp_damp.h"
 #include "bgpd/bgp_mplsvpn.h"
+#include "bgpd/bgp_srv6vpn.h"
 #if ENABLE_BGP_VNC
 #include "bgpd/rfapi/bgp_rfapi_cfg.h"
 #include "bgpd/rfapi/rfapi_backend.h"
@@ -1502,7 +1503,7 @@ static void bgp_recalculate_afi_safi_bestpaths(struct bgp *bgp, afi_t afi,
 			/* Special handling for 2-level routing
 			 * tables. */
 			if (safi == SAFI_MPLS_VPN || safi == SAFI_ENCAP
-			    || safi == SAFI_EVPN) {
+			    || safi == SAFI_EVPN || safi == SAFI_SRV6_VPN) {
 				for (nrn = bgp_table_top(table);
 				     nrn; nrn = bgp_route_next(nrn))
 					bgp_process(bgp, nrn, afi, safi);
@@ -1691,6 +1692,8 @@ void peer_as_change(struct peer *peer, as_t as, int as_specified)
 		UNSET_FLAG(peer->af_flags[AFI_IP][SAFI_LABELED_UNICAST],
 			   PEER_FLAG_REFLECTOR_CLIENT);
 		UNSET_FLAG(peer->af_flags[AFI_IP][SAFI_MPLS_VPN],
+			   PEER_FLAG_REFLECTOR_CLIENT);
+		UNSET_FLAG(peer->af_flags[AFI_IP][SAFI_SRV6_VPN],
 			   PEER_FLAG_REFLECTOR_CLIENT);
 		UNSET_FLAG(peer->af_flags[AFI_IP][SAFI_ENCAP],
 			   PEER_FLAG_REFLECTOR_CLIENT);
@@ -3002,6 +3005,16 @@ static struct bgp *bgp_create(as_t *as, const char *name,
 		bgp->vpn_policy[afi].export_vrf = list_new();
 		bgp->vpn_policy[afi].export_vrf->del =
 			bgp_vrf_string_name_delete;
+
+		bgp->srv6vpn_policy[afi].bgp = bgp;
+		bgp->srv6vpn_policy[afi].afi = afi;
+		memset(&bgp->srv6vpn_policy[afi].tovpn_sid, 0, sizeof(struct in6_addr));
+		memset(&bgp->srv6vpn_policy[afi].tovpn_zebra_vrf_sid_last_sent, 0, sizeof(struct in6_addr));
+
+		bgp->srv6vpn_policy[afi].import_vrf = list_new();
+		bgp->srv6vpn_policy[afi].import_vrf->del = bgp_vrf_string_name_delete;
+		bgp->srv6vpn_policy[afi].export_vrf = list_new();
+		bgp->srv6vpn_policy[afi].export_vrf->del = bgp_vrf_string_name_delete;
 	}
 	if (name) {
 		bgp->name = XSTRDUP(MTYPE_BGP, name);
@@ -3327,6 +3340,9 @@ int bgp_delete(struct bgp *bgp)
 	vpn_leak_zebra_vrf_label_withdraw(bgp, AFI_IP);
 	vpn_leak_zebra_vrf_label_withdraw(bgp, AFI_IP6);
 
+	/* unmap bgp vrf sid */
+	srv6vpn_leak_zebra_vrf_sid_withdraw(bgp, AFI_IP);
+
 	/* Stop timers. */
 	if (bgp->t_rmap_def_originate_eval) {
 		BGP_TIMER_OFF(bgp->t_rmap_def_originate_eval);
@@ -3436,7 +3452,7 @@ void bgp_free(struct bgp *bgp)
 	FOREACH_AFI_SAFI (afi, safi) {
 		/* Special handling for 2-level routing tables. */
 		if (safi == SAFI_MPLS_VPN || safi == SAFI_ENCAP
-		    || safi == SAFI_EVPN) {
+		    || safi == SAFI_EVPN || safi == SAFI_SRV6_VPN) {
 			for (rn = bgp_table_top(bgp->rib[afi][safi]); rn;
 			     rn = bgp_route_next(rn)) {
 				table = bgp_node_get_bgp_table_info(rn);
@@ -3761,6 +3777,7 @@ int peer_active(struct peer *peer)
 	if (peer->afc[AFI_IP][SAFI_UNICAST] || peer->afc[AFI_IP][SAFI_MULTICAST]
 	    || peer->afc[AFI_IP][SAFI_LABELED_UNICAST]
 	    || peer->afc[AFI_IP][SAFI_MPLS_VPN] || peer->afc[AFI_IP][SAFI_ENCAP]
+	    || peer->afc[AFI_IP][SAFI_MPLS_VPN]
 	    || peer->afc[AFI_IP][SAFI_FLOWSPEC]
 	    || peer->afc[AFI_IP6][SAFI_UNICAST]
 	    || peer->afc[AFI_IP6][SAFI_MULTICAST]
@@ -3780,6 +3797,7 @@ int peer_active_nego(struct peer *peer)
 	    || peer->afc_nego[AFI_IP][SAFI_MULTICAST]
 	    || peer->afc_nego[AFI_IP][SAFI_LABELED_UNICAST]
 	    || peer->afc_nego[AFI_IP][SAFI_MPLS_VPN]
+	    || peer->afc_nego[AFI_IP][SAFI_SRV6_VPN]
 	    || peer->afc_nego[AFI_IP][SAFI_ENCAP]
 	    || peer->afc_nego[AFI_IP][SAFI_FLOWSPEC]
 	    || peer->afc_nego[AFI_IP6][SAFI_UNICAST]
@@ -7454,6 +7472,8 @@ static void bgp_config_write_family(struct vty *vty, struct bgp *bgp, afi_t afi,
 			vty_frame(vty, "ipv4 encap");
 		else if (safi == SAFI_FLOWSPEC)
 			vty_frame(vty, "ipv4 flowspec");
+		else if (safi == SAFI_SRV6_VPN)
+			vty_frame(vty, "ipv4 srv6-vpn");
 	} else if (afi == AFI_IP6) {
 		if (safi == SAFI_UNICAST)
 			vty_frame(vty, "ipv6 unicast");
@@ -7513,6 +7533,15 @@ static void bgp_config_write_family(struct vty *vty, struct bgp *bgp, afi_t afi,
 
 			vty_out(vty, "  import vpn\n");
 		}
+
+		bgp_srv6vpn_policy_config_write_afi(vty, bgp, afi);
+		if (CHECK_FLAG(bgp->af_flags[afi][safi], BGP_CONFIG_VRF_TO_SRV6VPN_EXPORT)) {
+			vty_out(vty, "  export srv6-vpn\n");
+		}
+		if (CHECK_FLAG(bgp->af_flags[afi][safi], BGP_CONFIG_SRV6VPN_TO_VRF_IMPORT)) {
+			vty_out(vty, "  import srv6-vpn\n");
+		}
+
 		if (CHECK_FLAG(bgp->af_flags[afi][safi],
 			       BGP_CONFIG_VRF_TO_VRF_IMPORT)) {
 			char *name;
@@ -7811,6 +7840,9 @@ int bgp_config_write(struct vty *vty)
 
 		/* EVPN configuration.  */
 		bgp_config_write_family(vty, bgp, AFI_L2VPN, SAFI_EVPN);
+
+		/* IPv4 SRv6-VPN configuration.  */
+		bgp_config_write_family(vty, bgp, AFI_IP, SAFI_SRV6_VPN);
 
 		hook_call(bgp_inst_config_write, bgp, vty);
 
