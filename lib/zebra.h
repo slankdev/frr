@@ -369,7 +369,8 @@ typedef enum {
 	SAFI_EVPN = 5,
 	SAFI_LABELED_UNICAST = 6,
 	SAFI_FLOWSPEC = 7,
-	SAFI_MAX = 8
+	SAFI_SRV6_VPN = 8,
+	SAFI_MAX = 9
 } safi_t;
 
 /* Default Administrative Distance of each protocol. */

@@ -7454,6 +7454,8 @@ static void bgp_config_write_family(struct vty *vty, struct bgp *bgp, afi_t afi,
 			vty_frame(vty, "ipv4 encap");
 		else if (safi == SAFI_FLOWSPEC)
 			vty_frame(vty, "ipv4 flowspec");
+		else if (safi == SAFI_SRV6_VPN)
+			vty_frame(vty, "ipv4 srv6-vpn");
 	} else if (afi == AFI_IP6) {
 		if (safi == SAFI_UNICAST)
 			vty_frame(vty, "ipv6 unicast");
@@ -7811,6 +7813,9 @@ int bgp_config_write(struct vty *vty)
 
 		/* EVPN configuration.  */
 		bgp_config_write_family(vty, bgp, AFI_L2VPN, SAFI_EVPN);
+
+		/* IPv4 SRv6-VPN configuration.  */
+		bgp_config_write_family(vty, bgp, AFI_IP, SAFI_SRV6_VPN);
 
 		hook_call(bgp_inst_config_write, bgp, vty);
 

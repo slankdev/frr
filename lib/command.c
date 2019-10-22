@@ -114,6 +114,7 @@ const char *node_names[] = {
 	"bgp vnc l2",		    // BGP_VNC_L2_GROUP_NODE,
 	"rfp defaults",		    // RFP_DEFAULTS_NODE,
 	"bgp evpn",		    // BGP_EVPN_NODE,
+	"bgp srv6 vpnv4",		    // BGP_SRV6_VPNV4_NODE,
 	"ospf",			    // OSPF_NODE,
 	"ospf6",		    // OSPF6_NODE,
 	"ldp",			    // LDP_NODE,
@@ -978,6 +979,7 @@ enum node_type node_parent(enum node_type node)
 	case BGP_EVPN_NODE:
 	case BGP_IPV6L_NODE:
 	case BMP_NODE:
+	case BGP_SRV6_VPNV4_NODE:
 		ret = BGP_NODE;
 		break;
 	case BGP_EVPN_VNI_NODE:
@@ -1497,6 +1499,7 @@ void cmd_exit(struct vty *vty)
 	case BGP_EVPN_NODE:
 	case BGP_IPV6L_NODE:
 	case BMP_NODE:
+	case BGP_SRV6_VPNV4_NODE:
 		vty->node = BGP_NODE;
 		break;
 	case BGP_EVPN_VNI_NODE:
