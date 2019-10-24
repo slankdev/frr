@@ -467,6 +467,7 @@ leak_update(struct bgp *bgp, /* destination bgp instance */
 	    struct bgp *bgp_orig, struct prefix *nexthop_orig,
 	    int nexthop_self_flag, int debug)
 {
+	zlog_debug("%s:%d slankdev", __func__, __LINE__);
 	struct prefix *p = &bn->p;
 	struct bgp_path_info *bpi;
 	struct bgp_path_info *bpi_ultimate;

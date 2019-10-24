@@ -2870,6 +2870,7 @@ size_t bgp_packet_mpattr_start(struct stream *s, struct peer *peer, afi_t afi,
 	/* Set extended bit always to encode the attribute length as 2 bytes */
 	stream_putc(s, BGP_ATTR_FLAG_OPTIONAL | BGP_ATTR_FLAG_EXTLEN);
 	stream_putc(s, BGP_ATTR_MP_REACH_NLRI);
+	zlog_debug("%s:%05d slankdev stream_putc BGP_ATTR_MP_REACH_NLRI\n", __func__, __LINE__);
 	sizep = stream_get_endp(s);
 	stream_putw(s, 0); /* Marker: Attribute length. */
 
@@ -2904,6 +2905,15 @@ size_t bgp_packet_mpattr_start(struct stream *s, struct peer *peer, afi_t afi,
 			stream_putl(s, 0);
 			stream_put(s, &attr->mp_nexthop_global_in, 4);
 			break;
+
+		//TODO: (slankdev)
+		case SAFI_SRV6_VPN:
+			stream_putc(s, 12);
+			stream_putl(s, 0); /* RD = 0, per RFC */
+			stream_putl(s, 0);
+			stream_put(s, &attr->mp_nexthop_global_in, 4);
+			break;
+
 		case SAFI_ENCAP:
 		case SAFI_EVPN:
 			stream_putc(s, 4);
