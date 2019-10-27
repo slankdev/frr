@@ -2900,22 +2900,11 @@ size_t bgp_packet_mpattr_start(struct stream *s, struct peer *peer, afi_t afi,
 			stream_put_ipv4(s, attr->nexthop.s_addr);
 			break;
 		case SAFI_MPLS_VPN:
-			{
-			zlog_debug("%s:%d ====================", __func__, __LINE__);
-			zlog_debug("%s:%d SLANK SLANK MPLS-VPN", __func__, __LINE__);
-			zlog_debug("%s:%d ====================", __func__, __LINE__);
 			stream_putc(s, 12);
 			stream_putl(s, 0); /* RD = 0, per RFC */
 			stream_putl(s, 0);
 			stream_put(s, &attr->mp_nexthop_global_in, 4);
-
-			char str[128], str2[128];
-			inet_ntop(AF_INET, &attr->mp_nexthop_global_in, str, sizeof(str));
-			inet_ntop(AF_INET, &attr->nexthop, str2, sizeof(str2));
-			zlog_debug("%s:%d [mp_nexthop_global_in -> %s]", __func__, __LINE__, str);
-			zlog_debug("%s:%d [nexthop -> %s]", __func__, __LINE__, str2);
 			break;
-		}
 
 		//TODO: (slankdev)
 		case SAFI_SRV6_VPN:
