@@ -467,7 +467,7 @@ leak_update(struct bgp *bgp, /* destination bgp instance */
 	    struct bgp *bgp_orig, struct prefix *nexthop_orig,
 	    int nexthop_self_flag, int debug)
 {
-	zlog_debug("%s:%d slankdev", __func__, __LINE__);
+	zlog_debug("%s:%d slankdev afi/safi=%d/%d", __func__, __LINE__, afi, safi);
 	struct prefix *p = &bn->p;
 	struct bgp_path_info *bpi;
 	struct bgp_path_info *bpi_ultimate;
@@ -476,7 +476,7 @@ leak_update(struct bgp *bgp, /* destination bgp instance */
 
 	if (debug) {
 		prefix2str(&bn->p, buf_prefix, sizeof(buf_prefix));
-		zlog_debug("%s: entry: leak-to=%s, p=%s, type=%d, sub_type=%d",
+		zlog_debug("%s: entry: leak-to=%s, p=%s, type=%d, sub_type=%d slankdev",
 			   __func__, bgp->name_pretty, buf_prefix,
 			   source_bpi->type, source_bpi->sub_type);
 	}
@@ -518,7 +518,7 @@ leak_update(struct bgp *bgp, /* destination bgp instance */
 			bgp_attr_unintern(&new_attr);
 			if (debug)
 				zlog_debug(
-					"%s: ->%s: %s: Found route, no change",
+					"%s: ->%s: %s: Found route, no change. slankdev",
 					__func__, bgp->name_pretty,
 					buf_prefix);
 			return NULL;
@@ -567,7 +567,7 @@ leak_update(struct bgp *bgp, /* destination bgp instance */
 							   afi, bpi, NULL, 0);
 
 		if (debug)
-			zlog_debug("%s: nexthop is %svalid (in vrf %s)",
+			zlog_debug("%s: nexthop is %svalid (in vrf %s) slankdev",
 				__func__, (nh_valid ? "" : "not "),
 				bgp_nexthop->name_pretty);
 
@@ -580,7 +580,7 @@ leak_update(struct bgp *bgp, /* destination bgp instance */
 		bgp_unlock_node(bn);
 
 		if (debug)
-			zlog_debug("%s: ->%s: %s Found route, changed attr",
+			zlog_debug("%s: ->%s: %s Found route, changed attr slankdev",
 				   __func__, bgp->name_pretty, buf_prefix);
 
 		return bpi;
@@ -632,7 +632,7 @@ leak_update(struct bgp *bgp, /* destination bgp instance */
 						afi, new, NULL, 0);
 
 	if (debug)
-		zlog_debug("%s: nexthop is %svalid (in vrf %s)",
+		zlog_debug("%s: nexthop is %svalid (in vrf %s) slankdev",
 			__func__, (nh_valid ? "" : "not "),
 			bgp_nexthop->name_pretty);
 	if (nh_valid)
@@ -645,7 +645,7 @@ leak_update(struct bgp *bgp, /* destination bgp instance */
 	bgp_process(bgp, bn, afi, safi);
 
 	if (debug)
-		zlog_debug("%s: ->%s: %s: Added new route", __func__,
+		zlog_debug("%s: ->%s: %s: Added new route. slankdev", __func__,
 			   bgp->name_pretty, buf_prefix);
 
 	return new;
@@ -656,6 +656,7 @@ void vpn_leak_from_vrf_update(struct bgp *bgp_vpn,	    /* to */
 			      struct bgp *bgp_vrf,	    /* from */
 			      struct bgp_path_info *path_vrf) /* route */
 {
+	zlog_debug("%s:%d slankdev", __func__, __LINE__);
 	int debug = BGP_DEBUG(vpn, VPN_LEAK_FROM_VRF);
 	struct prefix *p = &path_vrf->net->p;
 	afi_t afi = family2afi(p->family);
@@ -669,13 +670,13 @@ void vpn_leak_from_vrf_update(struct bgp *bgp_vpn,	    /* to */
 	int nexthop_self_flag = 0;
 
 	if (debug)
-		zlog_debug("%s: from vrf %s", __func__, bgp_vrf->name_pretty);
+		zlog_debug("%s: from vrf %s. slankdev", __func__, bgp_vrf->name_pretty);
 
 	if (debug && path_vrf->attr->ecommunity) {
 		char *s = ecommunity_ecom2str(path_vrf->attr->ecommunity,
 					      ECOMMUNITY_FORMAT_ROUTE_MAP, 0);
 
-		zlog_debug("%s: %s path_vrf->type=%d, EC{%s}", __func__,
+		zlog_debug("%s: %s path_vrf->type=%d, EC{%s}. slankdev", __func__,
 			   bgp_vrf->name, path_vrf->type, s);
 		XFREE(MTYPE_ECOMMUNITY_STR, s);
 	}
@@ -685,7 +686,7 @@ void vpn_leak_from_vrf_update(struct bgp *bgp_vpn,	    /* to */
 
 	if (!afi) {
 		if (debug)
-			zlog_debug("%s: can't get afi of prefix", __func__);
+			zlog_debug("%s: can't get afi of prefix. slankdev", __func__);
 		return;
 	}
 
@@ -695,9 +696,9 @@ void vpn_leak_from_vrf_update(struct bgp *bgp_vpn,	    /* to */
 
 	if (!vpn_leak_to_vpn_active(bgp_vrf, afi, &debugmsg)) {
 		if (debug)
-			zlog_debug("%s: %s skipping: %s", __func__,
+			zlog_debug("%s: %s skipping: %s [slankdev10293]", __func__,
 				   bgp_vrf->name, debugmsg);
-		return;
+		return; //slankdev
 	}
 
 	bgp_attr_dup(&static_attr, path_vrf->attr); /* shallow copy */
@@ -719,7 +720,7 @@ void vpn_leak_from_vrf_update(struct bgp *bgp_vpn,	    /* to */
 			bgp_attr_flush(&static_attr); /* free any added parts */
 			if (debug)
 				zlog_debug(
-					"%s: vrf %s route map \"%s\" says DENY, returning",
+					"%s: vrf %s route map \"%s\" says DENY, returning. slankdev",
 					__func__, bgp_vrf->name_pretty,
 					bgp_vrf->vpn_policy[afi]
 						.rmap[BGP_VPN_POLICY_DIR_TOVPN]
@@ -732,7 +733,7 @@ void vpn_leak_from_vrf_update(struct bgp *bgp_vpn,	    /* to */
 		char *s = ecommunity_ecom2str(static_attr.ecommunity,
 					      ECOMMUNITY_FORMAT_ROUTE_MAP, 0);
 
-		zlog_debug("%s: post route map static_attr.ecommunity{%s}",
+		zlog_debug("%s: post route map static_attr.ecommunity{%s}. slankdev",
 			   __func__, s);
 		XFREE(MTYPE_ECOMMUNITY_STR, s);
 	}
@@ -763,7 +764,7 @@ void vpn_leak_from_vrf_update(struct bgp *bgp_vpn,	    /* to */
 		char *s = ecommunity_ecom2str(static_attr.ecommunity,
 					      ECOMMUNITY_FORMAT_ROUTE_MAP, 0);
 
-		zlog_debug("%s: post merge static_attr.ecommunity{%s}",
+		zlog_debug("%s: post merge static_attr.ecommunity{%s}. slankdev",
 			   __func__, s);
 		XFREE(MTYPE_ECOMMUNITY_STR, s);
 	}
@@ -852,7 +853,7 @@ void vpn_leak_from_vrf_update(struct bgp *bgp_vpn,	    /* to */
 		char *s = ecommunity_ecom2str(new_attr->ecommunity,
 					      ECOMMUNITY_FORMAT_ROUTE_MAP, 0);
 
-		zlog_debug("%s: new_attr->ecommunity{%s}", __func__, s);
+		zlog_debug("%s: new_attr->ecommunity{%s}. slankdev", __func__, s);
 		XFREE(MTYPE_ECOMMUNITY_STR, s);
 	}
 
@@ -863,6 +864,8 @@ void vpn_leak_from_vrf_update(struct bgp *bgp_vpn,	    /* to */
 
 	struct bgp_path_info *new_info;
 
+
+	zlog_debug("%s:%d slankdev afi/safi=%d/%d", __func__, __LINE__, afi, safi);
 	new_info = leak_update(bgp_vpn, bn, new_attr, afi, safi, path_vrf,
 			       &label, 1, path_vrf, bgp_vrf, NULL,
 			       nexthop_self_flag, debug);
@@ -1033,6 +1036,7 @@ void vpn_leak_from_vrf_update_all(struct bgp *bgp_vpn, /* to */
 				zlog_debug(
 					"%s: calling vpn_leak_from_vrf_update",
 					__func__);
+			zlog_debug("%s:%d slankdev before vpn_leak_from_vrf_update()", __func__, __LINE__);
 			vpn_leak_from_vrf_update(bgp_vpn, bgp_vrf, bpi);
 		}
 	}
@@ -1223,6 +1227,7 @@ vpn_leak_to_vrf_update_onevrf(struct bgp *bgp_vrf,	    /* to */
 	else
 		src_vrf = bgp_vpn;
 
+	zlog_debug("%s:%d slankdev afi/safi=%d/%d", __func__, __LINE__, afi, safi);
 	leak_update(bgp_vrf, bn, new_attr, afi, safi, path_vpn, pLabels,
 		    num_labels, path_vpn, /* parent */
 		    src_vrf, &nexthop_orig, nexthop_self_flag, debug);

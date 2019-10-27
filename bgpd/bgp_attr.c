@@ -2870,7 +2870,7 @@ size_t bgp_packet_mpattr_start(struct stream *s, struct peer *peer, afi_t afi,
 	/* Set extended bit always to encode the attribute length as 2 bytes */
 	stream_putc(s, BGP_ATTR_FLAG_OPTIONAL | BGP_ATTR_FLAG_EXTLEN);
 	stream_putc(s, BGP_ATTR_MP_REACH_NLRI);
-	zlog_debug("%s:%05d slankdev stream_putc BGP_ATTR_MP_REACH_NLRI\n", __func__, __LINE__);
+	zlog_debug("%s:%05d slankdev stream_putc BGP_ATTR_MP_REACH_NLRI", __func__, __LINE__);
 	sizep = stream_get_endp(s);
 	stream_putw(s, 0); /* Marker: Attribute length. */
 
@@ -2900,14 +2900,28 @@ size_t bgp_packet_mpattr_start(struct stream *s, struct peer *peer, afi_t afi,
 			stream_put_ipv4(s, attr->nexthop.s_addr);
 			break;
 		case SAFI_MPLS_VPN:
+			{
+			zlog_debug("%s:%d ====================", __func__, __LINE__);
+			zlog_debug("%s:%d SLANK SLANK MPLS-VPN", __func__, __LINE__);
+			zlog_debug("%s:%d ====================", __func__, __LINE__);
 			stream_putc(s, 12);
 			stream_putl(s, 0); /* RD = 0, per RFC */
 			stream_putl(s, 0);
 			stream_put(s, &attr->mp_nexthop_global_in, 4);
+
+			char str[128], str2[128];
+			inet_ntop(AF_INET, &attr->mp_nexthop_global_in, str, sizeof(str));
+			inet_ntop(AF_INET, &attr->nexthop, str2, sizeof(str2));
+			zlog_debug("%s:%d [mp_nexthop_global_in -> %s]", __func__, __LINE__, str);
+			zlog_debug("%s:%d [nexthop -> %s]", __func__, __LINE__, str2);
 			break;
+		}
 
 		//TODO: (slankdev)
 		case SAFI_SRV6_VPN:
+			zlog_debug("%s:%d ====================", __func__, __LINE__);
+			zlog_debug("%s:%d SLANK SLANK SRV6-VPN", __func__, __LINE__);
+			zlog_debug("%s:%d ====================", __func__, __LINE__);
 			stream_putc(s, 12);
 			stream_putl(s, 0); /* RD = 0, per RFC */
 			stream_putl(s, 0);
@@ -3167,6 +3181,7 @@ bgp_size_t bgp_packet_attribute(struct bgp *bgp, struct peer *peer,
 				mpls_label_t *label, uint32_t num_labels,
 				int addpath_encode, uint32_t addpath_tx_id)
 {
+	zlog_debug("%s:%d slankdev afi/safi=%d/%d", __func__, __LINE__, afi, safi);
 	size_t cp;
 	size_t aspath_sizep;
 	struct aspath *aspath;
@@ -3185,6 +3200,8 @@ bgp_size_t bgp_packet_attribute(struct bgp *bgp, struct peer *peer,
 		 && !peer_cap_enhe(peer, afi, safi))) {
 		size_t mpattrlen_pos = 0;
 
+
+		zlog_debug("%s:%05d slankdev before bgp_packet_mpattr_start()", __func__, __LINE__);
 		mpattrlen_pos = bgp_packet_mpattr_start(s, peer, afi, safi,
 							vecarr, attr);
 		bgp_packet_mpattr_prefix(s, afi, safi, p, prd, label,

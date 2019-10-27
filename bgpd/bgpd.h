@@ -381,6 +381,9 @@ struct bgp {
 #define BGP_CONFIG_VRF_TO_VRF_IMPORT			(1 << 7)
 #define BGP_CONFIG_VRF_TO_VRF_EXPORT			(1 << 8)
 
+#define BGP_CONFIG_VRF_TO_SRV6VPN_EXPORT		(1 << 9)
+#define BGP_CONFIG_SRV6VPN_TO_VRF_IMPORT		(1 << 10)
+
 	/* BGP per AF peer count */
 	uint32_t af_peer_count[AFI_MAX][SAFI_MAX];
 

@@ -95,12 +95,27 @@ static inline int vpn_leak_to_vpn_active(struct bgp *bgp_vrf, afi_t afi,
 	}
 
 	/* Is vrf configured to export to vpn? */
-	if (!CHECK_FLAG(bgp_vrf->af_flags[afi][SAFI_UNICAST],
-			BGP_CONFIG_VRF_TO_MPLSVPN_EXPORT)
-	    && !CHECK_FLAG(bgp_vrf->af_flags[afi][SAFI_UNICAST],
-			   BGP_CONFIG_VRF_TO_VRF_EXPORT)) {
-		if (pmsg)
-			*pmsg = "export not set";
+	bool mpls_vpn_is_off =
+		!CHECK_FLAG(bgp_vrf->af_flags[afi][SAFI_UNICAST], BGP_CONFIG_VRF_TO_MPLSVPN_EXPORT) &&
+		!CHECK_FLAG(bgp_vrf->af_flags[afi][SAFI_UNICAST], BGP_CONFIG_VRF_TO_VRF_EXPORT);
+	bool srv6_export_off = !CHECK_FLAG(bgp_vrf->af_flags[afi][SAFI_UNICAST], BGP_CONFIG_VRF_TO_SRV6VPN_EXPORT);
+	bool vrf_export_off = !CHECK_FLAG(bgp_vrf->af_flags[afi][SAFI_UNICAST], BGP_CONFIG_VRF_TO_VRF_EXPORT);
+	// zlog_debug("SLANKDEV!! srv6_export_off=%s, vrf_export_off=%s", srv6_export_off?"true":"false", vrf_export_off?"true":"false");
+	// bool srv6_vpn_is_off = true
+	bool srv6_vpn_is_off = srv6_export_off && vrf_export_off;
+	if (mpls_vpn_is_off || srv6_vpn_is_off) {
+		if (pmsg) {
+			if (srv6_vpn_is_off && mpls_vpn_is_off)
+				*pmsg = "export not set (MPLS and SRv6)";
+			else if (mpls_vpn_is_off)
+				*pmsg = "export not set (MPLS)";
+			else if (srv6_vpn_is_off)
+				*pmsg = "export not set (SRv6)";
+			else {
+				zlog_debug("ABORT!! HO");
+				abort();
+			}
+		}
 		return 0;
 	}
 

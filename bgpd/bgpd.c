@@ -7515,6 +7515,12 @@ static void bgp_config_write_family(struct vty *vty, struct bgp *bgp, afi_t afi,
 
 			vty_out(vty, "  import vpn\n");
 		}
+		if (CHECK_FLAG(bgp->af_flags[afi][safi], BGP_CONFIG_VRF_TO_SRV6VPN_EXPORT)) {
+			vty_out(vty, "  export srv6-vpn\n");
+		}
+		if (CHECK_FLAG(bgp->af_flags[afi][safi], BGP_CONFIG_SRV6VPN_TO_VRF_IMPORT)) {
+			vty_out(vty, "  import srv6-vpn\n");
+		}
 		if (CHECK_FLAG(bgp->af_flags[afi][safi],
 			       BGP_CONFIG_VRF_TO_VRF_IMPORT)) {
 			char *name;

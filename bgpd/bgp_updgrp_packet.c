@@ -689,6 +689,7 @@ int subgroup_packets_to_build(struct update_subgroup *subgrp)
 /* Make BGP update packet.  */
 struct bpacket *subgroup_update_packet(struct update_subgroup *subgrp)
 {
+	//zlog_debug("%s:%d slankdev", __func__, __LINE__);
 	struct bpacket_attr_vec_arr vecarr;
 	struct bpacket *pkt;
 	struct peer *peer;
@@ -841,10 +842,12 @@ struct bpacket *subgroup_update_packet(struct update_subgroup *subgrp)
 				num_labels = path->extra->num_labels;
 			}
 
-			if (stream_empty(snlri))
+			if (stream_empty(snlri)) {
+				zlog_debug("%s:%05d slankdev before bgp_packet_mpattr_start()", __func__, __LINE__);
 				mpattrlen_pos = bgp_packet_mpattr_start(
 					snlri, peer, afi, safi, &vecarr,
 					adv->baa->attr);
+			}
 
 			bgp_packet_mpattr_prefix(snlri, afi, safi, &rn->p, prd,
 						 label_pnt, num_labels,
