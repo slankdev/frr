@@ -20,10 +20,11 @@
 
 #include <zebra.h>
 
+#include "network.h"
 #include "prefix.h"
 #include "stream.h"
 #include "zebra/zserv.h"
-#include "zebra/zebra_seg6.h"
+#include "zebra/zebra_srv6.h"
 #include "zebra/slankdev_netlink.h"
 #include <stdio.h>
 #include <string.h>
@@ -42,6 +43,7 @@
 
 extern struct zebra_privs_t zserv_privs;
 struct seg6local_sid *seg6local_sids[MAX_SEG6LOCAL_SIDS];
+static uint16_t sid_allocate_next = 0x10;
 
 static int zapi_seg6local_decode(struct stream *s, struct zapi_seg6local *api)
 {
@@ -71,6 +73,7 @@ stream_failure:
 	return 0;
 }
 
+#if 0
 static struct ipv6_sr_hdr *parse_srh(bool encap,
     size_t num_segs, const struct in6_addr *segs)
 {
@@ -88,6 +91,7 @@ static struct ipv6_sr_hdr *parse_srh(bool encap,
     memcpy(&srh->segments[srh_idx + i], &segs[num_segs - 1 - i], sizeof(struct in6_addr));
   return srh;
 }
+#endif
 
 static void adddel_in6_route(
     struct in6_addr *pref, uint32_t plen,
@@ -535,3 +539,50 @@ void zebra_srv6_sid_route_delete(ZAPI_HANDLER_ARGS)
 	}
 }
 
+void zebra_srv6_init()
+{
+}
+
+void zebra_srv6_get_locator(ZAPI_HANDLER_ARGS)
+{
+	struct srv6 *srv6 = srv6_get_default();
+	uint16_t preflen = srv6->locator.prefixlen;
+	struct in6_addr *prefix6 = &srv6->locator.prefix;
+
+
+	/* Create Response Msg */
+	struct stream *s = stream_new(ZEBRA_MAX_PACKET_SIZ);
+	zclient_create_header(s, ZEBRA_SRV6_GET_LOCATOR, 0);
+	stream_putw(s, preflen);
+	stream_put(s, prefix6, 16);
+	stream_putw_at(s, 0, stream_get_endp(s));
+
+	/* Send Response Msg */
+	int ret = writen(client->sock, s->data, stream_get_endp(s));
+	stream_free(s);
+	if (ret < 0)
+		zlog_err("%s: error occured", __func__);
+}
+
+void zebra_srv6_alloc_sid(ZAPI_HANDLER_ARGS)
+{
+	/* Generate NEW SID */
+	struct in6_addr sid;
+	struct srv6 *srv6 = srv6_get_default();
+	const struct in6_addr *loc = &srv6->locator.prefix;
+	memcpy(&sid, loc, sizeof(struct in6_addr));
+	sid.s6_addr16[7] = htons(sid_allocate_next++);
+	add_seg6local_sid(&sid, 128, SEG6_LOCAL_ACTION_END_DX4, NULL);
+
+	char str[128];
+	inet_ntop(AF_INET6, &sid, str, 128);
+	zlog_info("%s: Allocate new sid %s", __func__, str);
+
+	/* Create Response Msg */
+	struct stream *s = stream_new(ZEBRA_MAX_PACKET_SIZ);
+	zclient_create_header(s, ZEBRA_SRV6_ALLOC_SID, 0);
+	stream_put(s, &sid, 16);
+	stream_putw_at(s, 0, stream_get_endp(s));
+
+	zserv_send_message(client, s);
+}

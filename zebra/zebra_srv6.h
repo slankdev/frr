@@ -18,8 +18,8 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifndef _QUAGGA_ZEBRA_SEG6_H
-#define _QUAGGA_ZEBRA_SEG6_H
+#ifndef _QUAGGA_ZEBRA_SRV6_H
+#define _QUAGGA_ZEBRA_SRV6_H
 
 #include "qobj.h"
 #include "prefix.h"
@@ -51,7 +51,6 @@ extern int snprintf_seg6local_sid(char *str,
 
 extern size_t num_seg6local_sids(void);
 extern struct srv6 *srv6_get_default(void);
-extern int srv6_config_write(struct vty *);
 
 extern void zebra_seg6local_add(ZAPI_HANDLER_ARGS);
 extern void zebra_seg6local_delete(ZAPI_HANDLER_ARGS);
@@ -60,6 +59,10 @@ extern void zebra_seg6_delete(ZAPI_HANDLER_ARGS);
 
 extern void zebra_srv6_sid_route_add(ZAPI_HANDLER_ARGS);
 extern void zebra_srv6_sid_route_delete(ZAPI_HANDLER_ARGS);
+extern void zebra_srv6_get_locator(ZAPI_HANDLER_ARGS);
+extern void zebra_srv6_alloc_sid(ZAPI_HANDLER_ARGS);
 
+void zebra_srv6_init(void);
+void zebra_srv6_vty_init(void);
 
 #endif /* _QUAGGA_ZEBRA_SEG6_H */

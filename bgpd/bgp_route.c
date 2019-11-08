@@ -3065,6 +3065,9 @@ int bgp_update(struct peer *peer, struct prefix *p, uint32_t addpath_id,
 	if (safi == SAFI_SRV6_VPN && !sid_zero(&attr->sid))
 		has_valid_sid = 1;
 
+	if (safi == SAFI_MPLS_VPN && !sid_zero(&attr->sid))
+		has_valid_sid = 1;
+
 	/* When peer's soft reconfiguration enabled.  Record input packet in
 	   Adj-RIBs-In.  */
 	if (!soft_reconfig
@@ -3480,7 +3483,10 @@ int bgp_update(struct peer *peer, struct prefix *p, uint32_t addpath_id,
 							 BGP_PATH_VALID);
 			}
 		} else
+		{
+			zlog_debug("before bgp_path_info_set_flag PATH_VALID");
 			bgp_path_info_set_flag(rn, pi, BGP_PATH_VALID);
+		}
 
 #if ENABLE_BGP_VNC
 		if (safi == SAFI_MPLS_VPN) {
@@ -3525,7 +3531,7 @@ int bgp_update(struct peer *peer, struct prefix *p, uint32_t addpath_id,
 			|| bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
 
 			vpn_leak_from_vrf_update(bgp_get_default(), bgp, pi);
-			srv6vpn_leak_from_vrf_update(bgp_get_default(), bgp, pi);
+			//srv6vpn_leak_from_vrf_update(bgp_get_default(), bgp, pi);
 		}
 		if ((SAFI_MPLS_VPN == safi)
 		    && (bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
@@ -3585,6 +3591,15 @@ int bgp_update(struct peer *peer, struct prefix *p, uint32_t addpath_id,
 
 	/* Update SRv6 SID */
 	if (safi == SAFI_SRV6_VPN) {
+		extra = bgp_path_info_extra_get(new);
+		if (sid_zero(extra->sid)) {
+			memcpy(&extra->sid, &attr->sid, 16);
+			extra->num_sids = 1;
+		}
+	}
+
+	/* Update SRv6 SID */
+	if (safi == SAFI_MPLS_VPN) {
 		extra = bgp_path_info_extra_get(new);
 		if (sid_zero(extra->sid)) {
 			memcpy(&extra->sid, &attr->sid, 16);
@@ -3672,7 +3687,7 @@ int bgp_update(struct peer *peer, struct prefix *p, uint32_t addpath_id,
 	    && (bgp->inst_type == BGP_INSTANCE_TYPE_VRF
 		|| bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
 		vpn_leak_from_vrf_update(bgp_get_default(), bgp, new);
-		srv6vpn_leak_from_vrf_update(bgp_get_default(), bgp, new);
+		//srv6vpn_leak_from_vrf_update(bgp_get_default(), bgp, new);
 	}
 	if ((SAFI_MPLS_VPN == safi)
 	    && (bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
@@ -4852,8 +4867,7 @@ void bgp_static_update(struct bgp *bgp, struct prefix *p,
 					   == BGP_INSTANCE_TYPE_DEFAULT)) {
 				vpn_leak_from_vrf_update(bgp_get_default(), bgp,
 							 pi);
-				srv6vpn_leak_from_vrf_update(bgp_get_default(), bgp,
-							 pi);
+				//srv6vpn_leak_from_vrf_update(bgp_get_default(), bgp, pi);
 			}
 
 			bgp_unlock_node(rn);
@@ -4907,7 +4921,7 @@ void bgp_static_update(struct bgp *bgp, struct prefix *p,
 	    && (bgp->inst_type == BGP_INSTANCE_TYPE_VRF
 		|| bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
 		vpn_leak_from_vrf_update(bgp_get_default(), bgp, new);
-		srv6vpn_leak_from_vrf_update(bgp_get_default(), bgp, new);
+		//srv6vpn_leak_from_vrf_update(bgp_get_default(), bgp, new);
 	}
 
 	/* Unintern original. */
@@ -6932,8 +6946,7 @@ void bgp_redistribute_add(struct bgp *bgp, struct prefix *p,
 
 					vpn_leak_from_vrf_update(
 						bgp_get_default(), bgp, bpi);
-					srv6vpn_leak_from_vrf_update(
-						bgp_get_default(), bgp, bpi);
+					//srv6vpn_leak_from_vrf_update(bgp_get_default(), bgp, bpi);
 				}
 				return;
 			}
@@ -6952,7 +6965,7 @@ void bgp_redistribute_add(struct bgp *bgp, struct prefix *p,
 		    || (bgp->inst_type == BGP_INSTANCE_TYPE_DEFAULT)) {
 
 			vpn_leak_from_vrf_update(bgp_get_default(), bgp, new);
-			srv6vpn_leak_from_vrf_update(bgp_get_default(), bgp, new);
+			//srv6vpn_leak_from_vrf_update(bgp_get_default(), bgp, new);
 		}
 	}
 

@@ -27,7 +27,7 @@
 #include "table.h"
 #include "srcdest_table.h"
 #include "mpls.h"
-#include "seg6.h"
+#include "srv6.h"
 
 #include "static_vrf.h"
 #include "static_memory.h"

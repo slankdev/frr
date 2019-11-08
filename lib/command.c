@@ -139,6 +139,7 @@ const char *node_names[] = {
 	"forwarding",		    // FORWARDING_NODE,
 	"protocol",		    // PROTOCOL_NODE,
 	"mpls",			    // MPLS_NODE,
+	"srv6",			    // SRV6_NODE,
 	"pw",			    // PW_NODE,
 	"vty",			    // VTY_NODE,
 	"link-params",		    // LINK_PARAMS_NODE,
@@ -153,7 +154,6 @@ const char *node_names[] = {
 	"openfabric",		    // OPENFABRIC_NODE
 	"vrrp",			    /* VRRP_NODE */
 	"bmp",			 /* BMP_NODE */
-	"srv6",			 /* SRV6_NODE */
 };
 /* clang-format on */
 

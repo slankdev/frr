@@ -1175,10 +1175,6 @@ static char **new_completion(const char *text, int start, int end)
 }
 
 /* Vty node structures. */
-static struct cmd_node srv6_node = {
-	SRV6_NODE, "%s(config-srv6)# ",
-};
-
 static struct cmd_node bgp_node = {
 	BGP_NODE, "%s(config-router)# ",
 };
@@ -1210,6 +1206,10 @@ static struct cmd_node vrf_node = {
 static struct cmd_node nh_group_node = {
 	NH_GROUP_NODE,
 	"%s(config-nh-group)# ",
+};
+
+static struct cmd_node srv6_node = {
+	SRV6_NODE, "%s(config-srv6)# ",
 };
 
 static struct cmd_node rmap_node = {RMAP_NODE, "%s(config-route-map)# "};
@@ -3743,7 +3743,6 @@ void vtysh_init_vty(void)
 	cmd_variable_handler_register(vtysh_var_handler);
 
 	/* Install nodes. */
-	install_node(&srv6_node, NULL);
 	install_node(&bgp_node, NULL);
 	install_node(&rip_node, NULL);
 	install_node(&interface_node, NULL);
@@ -3794,6 +3793,7 @@ void vtysh_init_vty(void)
 	install_node(&bfd_node, NULL);
 	install_node(&bfd_peer_node, NULL);
 #endif /* HAVE_BFDD */
+	install_node(&srv6_node, NULL);
 
 	struct cmd_node *node;
 	for (unsigned int i = 0; i < vector_active(cmdvec); i++) {
@@ -3989,7 +3989,6 @@ void vtysh_init_vty(void)
 #endif
 	install_element(CONFIG_NODE, &router_isis_cmd);
 	install_element(CONFIG_NODE, &router_openfabric_cmd);
-	install_element(CONFIG_NODE, &segment_routing_ipv6_cmd);
 	install_element(CONFIG_NODE, &router_bgp_cmd);
 #ifdef KEEP_OLD_VPN_COMMANDS
 	install_element(BGP_NODE, &address_family_vpnv4_cmd);
@@ -4043,7 +4042,9 @@ void vtysh_init_vty(void)
 	install_element(BGP_EVPN_NODE, &bgp_evpn_vni_cmd);
 	install_element(BGP_EVPN_VNI_NODE, &exit_vni_cmd);
 
+	install_element(CONFIG_NODE, &segment_routing_ipv6_cmd);
 	install_element(SRV6_NODE, &exit_srv6_config_cmd);
+
 	install_element(BGP_VRF_POLICY_NODE, &exit_vrf_policy_cmd);
 	install_element(BGP_VNC_DEFAULTS_NODE, &exit_vnc_config_cmd);
 	install_element(BGP_VNC_NVE_GROUP_NODE, &exit_vnc_config_cmd);

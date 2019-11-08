@@ -450,6 +450,11 @@ void nexthop_copy(struct nexthop *copy, const struct nexthop *nexthop,
 		nexthop_add_labels(copy, nexthop->nh_label_type,
 				   nexthop->nh_label->num_labels,
 				   &nexthop->nh_label->label[0]);
+
+	if (nexthop->nh_seg6_segs)
+		nexthop_add_segs(copy, nexthop->nh_seg6_mode,
+				   nexthop->nh_seg6_segs->num_segs,
+				   &nexthop->nh_seg6_segs->segs[0]);
 }
 
 struct nexthop *nexthop_dup(const struct nexthop *nexthop,

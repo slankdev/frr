@@ -147,6 +147,7 @@ enum node_type {
 	FORWARDING_NODE,	 /* IP forwarding node. */
 	PROTOCOL_NODE,		 /* protocol filtering node */
 	MPLS_NODE,		 /* MPLS config node */
+	SRV6_NODE,		 /* SRv6 config */
 	PW_NODE,		 /* Pseudowire config node */
 	VTY_NODE,		 /* Vty node. */
 	LINK_PARAMS_NODE,	/* Link-parameters node */
@@ -160,7 +161,6 @@ enum node_type {
 	OPENFABRIC_NODE,	/* OpenFabric router configuration node */
 	VRRP_NODE,		 /* VRRP node */
 	BMP_NODE,		/* BMP config under router bgp */
-	SRV6_NODE,   /* SRv6 config */
 	BGP_SRV6_VPNV4_NODE,		 /* BGP SRv6-VPN PE exchange. */
 	NODE_TYPE_MAX, /* maximum */
 };

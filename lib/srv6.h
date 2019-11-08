@@ -19,11 +19,17 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-#ifndef _FRR_SEG6_H
-#define _FRR_SEG6_H
+#ifndef _FRR_SRV6_H
+#define _FRR_SRV6_H
 
 #include <zebra.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
+#include <linux/seg6_iptunnel.h>
+#include <linux/lwtunnel.h>
+#include <linux/seg6_local.h>
+
+#define SRV6_MAX_SIDS 16
 
 #ifdef __cplusplus
 extern "C" {
@@ -67,6 +73,32 @@ static inline bool sid_zero(
 {
 	uint8_t zero[16] = {0};
 	return sid_same(a, (const struct in6_addr*)zero);
+}
+
+static inline void* sid_copy(struct in6_addr *dst,
+		const struct in6_addr *src)
+{ return memcpy(dst, src, sizeof(struct in6_addr)); }
+
+static inline const char* sid2str(
+		const struct in6_addr *sid, char *str, size_t size)
+{ return inet_ntop(AF_INET6, sid, str, size); }
+
+static inline struct ipv6_sr_hdr *parse_srh(bool encap,
+    size_t num_segs, const struct in6_addr *segs)
+{
+  const size_t srhlen = 8 + sizeof(struct in6_addr)*(encap ? num_segs+1 : num_segs);
+
+  struct ipv6_sr_hdr *srh = malloc(srhlen);
+  memset(srh, 0, srhlen);
+  srh->hdrlen = (srhlen >> 3) - 1;
+  srh->type = 4;
+  srh->segments_left = encap ? num_segs : num_segs - 1;
+  srh->first_segment = encap ? num_segs : num_segs - 1;
+
+  size_t srh_idx = encap ? 1 : 0;
+  for (ssize_t i=num_segs-1; i>=0; i--)
+    memcpy(&srh->segments[srh_idx + i], &segs[num_segs - 1 - i], sizeof(struct in6_addr));
+  return srh;
 }
 
 #ifdef __cplusplus

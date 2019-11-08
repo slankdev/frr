@@ -24,7 +24,7 @@
 #include "lib/json.h"
 #include "lib_errors.h"
 #include "lib/zclient.h"
-#include "lib/seg6.h"
+#include "lib/srv6.h"
 #include "prefix.h"
 #include "plist.h"
 #include "buffer.h"
@@ -6618,8 +6618,12 @@ DEFPY (af_rd_vpn_export,
 	/*
 	 * pre-change: un-export vpn routes (vpn->vrf routes unaffected)
 	 */
-	srv6vpn_leak_prechange(BGP_VPN_POLICY_DIR_TOVPN, afi,
+	vpn_leak_prechange(BGP_VPN_POLICY_DIR_TOVPN, afi,
 			   bgp_get_default(), bgp);
+
+	struct bgp *bgp_vpn = bgp_get_default();
+	if (bgp_vpn->vpn_policy[afi].enable_srv6_vpn)
+		bgp->vpn_policy[afi].enable_srv6_vpn = true;
 
 	if (yes) {
 		bgp->vpn_policy[afi].tovpn_rd = prd;
@@ -6644,6 +6648,62 @@ ALIAS (af_rd_vpn_export,
        "Specify route distinguisher\n"
        "Between current address-family and vpn\n"
        "For routes leaked from current address-family to vpn\n")
+
+DEFUN (segment_routing_ipv6,
+       segment_routing_ipv6_cmd,
+       "[no] segment-routing-ipv6",
+       NO_STR
+       "Enable or Disable Segment-Routing-IPv6\n")
+{
+	LOG_CLI(argc, argv);
+
+	int idx = 0;
+	bool yes = true;
+	if (argv_find(argv, argc, "no", &idx))
+		yes = false;
+
+	struct bgp *bgp = bgp_get_default();
+	bgp->vpn_policy[AFI_IP].enable_srv6_vpn = yes;
+	return CMD_SUCCESS;
+}
+
+DEFUN (af_sid_vpn_export_locator,
+       af_sid_vpn_export_locator_cmd,
+       "[no] sid vpn export locator default",
+       NO_STR
+       "SRv6-SID value for VRF\n"
+       "Between current address-family and vpn\n"
+       "For routes leaked from current address-family to vpn\n"
+			 "Specify locator\n"
+			 "Specify default locator\n")
+{
+	LOG_CLI(argc, argv);
+
+	int idx = 0;
+	bool yes = true;
+	if (argv_find(argv, argc, "no", &idx))
+		yes = false;
+
+	if (!yes) {
+		zlog_err("%s: negate mode isn't implemented", __func__);
+		return CMD_WARNING_CONFIG_FAILED;
+	}
+
+	VTY_DECLVAR_CONTEXT(bgp, bgp);
+	afi_t afi = srv6vpn_policy_getafi(vty, bgp);
+
+	vpn_leak_prechange(BGP_VPN_POLICY_DIR_TOVPN, afi, bgp_get_default(), bgp);
+
+	if (sid_zero(&bgp->vpn_policy[afi].tovpn_sid)) {
+		SET_FLAG(bgp->vpn_policy[afi].flags,
+			 BGP_VPN_POLICY_TOVPN_SID_AUTO);
+		bgp_srv6_sid_alloc();
+	}
+
+	vpn_leak_postchange(BGP_VPN_POLICY_DIR_TOVPN, afi, bgp_get_default(), bgp);
+
+	return CMD_SUCCESS;
+}
 
 DEFPY (af_sid_srv6vpn_export,
        af_sid_srv6vpn_export_cmd,
@@ -12440,6 +12500,7 @@ DEFUN (bgp_redistribute_ipv4,
        "Redistribute information from another routing protocol\n"
        FRR_IP_REDIST_HELP_STR_BGPD)
 {
+	LOG_CLI(argc, argv);
 	VTY_DECLVAR_CONTEXT(bgp, bgp);
 	int idx_protocol = 1;
 	int type;
@@ -13262,6 +13323,11 @@ void bgp_vpn_policy_config_write_afi(struct vty *vty, struct bgp *bgp,
 	    || CHECK_FLAG(bgp->af_flags[afi][SAFI_UNICAST],
 			  BGP_CONFIG_VRF_TO_VRF_EXPORT))
 		return;
+
+	if (CHECK_FLAG(bgp->vpn_policy[afi].flags,
+		BGP_VPN_POLICY_TOVPN_SID_AUTO)) {
+		vty_out(vty, "%*ssid vpn export locator default\n", indent, "");
+	}
 
 	if (CHECK_FLAG(bgp->vpn_policy[afi].flags,
 		BGP_VPN_POLICY_TOVPN_LABEL_AUTO)) {
@@ -14754,6 +14820,8 @@ void bgp_vty_init(void)
 	install_element(BGP_IPV6_NODE, &af_no_import_vrf_route_map_cmd);
 
 	/* srv6vpn-policy commands */
+	install_element(BGP_VPNV4_NODE, &segment_routing_ipv6_cmd);
+	install_element(BGP_IPV4_NODE, &af_sid_vpn_export_locator_cmd);
 	install_element(BGP_IPV4_NODE, &af_rd_srv6vpn_export_cmd);
 	install_element(BGP_IPV4_NODE, &af_sid_srv6vpn_export_cmd);
 	install_element(BGP_IPV4_NODE, &af_nexthop_srv6vpn_export_cmd);

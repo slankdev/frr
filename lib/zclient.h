@@ -184,6 +184,8 @@ typedef enum {
 	ZEBRA_SEG6_DELETE,
 	ZEBRA_SRV6_SID_ROUTE_ADD,
 	ZEBRA_SRV6_SID_ROUTE_DELETE,
+	ZEBRA_SRV6_GET_LOCATOR,
+	ZEBRA_SRV6_ALLOC_SID,
 } zebra_message_types_t;
 
 struct redist_proto {
@@ -278,6 +280,7 @@ struct zclient {
 	int (*iptable_notify_owner)(ZAPI_CALLBACK_ARGS);
 	int (*vxlan_sg_add)(ZAPI_CALLBACK_ARGS);
 	int (*vxlan_sg_del)(ZAPI_CALLBACK_ARGS);
+	int (*srv6_sid_alloc)(ZAPI_CALLBACK_ARGS);
 };
 
 /* Zebra API message flag. */
@@ -288,6 +291,7 @@ struct zclient {
 #define ZAPI_MESSAGE_MTU      0x10
 #define ZAPI_MESSAGE_SRCPFX   0x20
 #define ZAPI_MESSAGE_LABEL    0x40
+#define ZAPI_MESSAGE_SEG6     0x80
 /*
  * This should only be used by a DAEMON that needs to communicate
  * the table being used is not in the VRF.  You must pass the
@@ -319,6 +323,9 @@ struct zapi_nexthop {
 	/* MPLS labels for BGP-LU or Segment Routing */
 	uint8_t label_num;
 	mpls_label_t labels[MPLS_MAX_LABELS];
+
+	uint8_t sid_num;
+	struct in6_addr sids[SRV6_MAX_SIDS];
 
 	struct ethaddr rmac;
 };
@@ -709,6 +716,8 @@ extern int tm_get_table_chunk(struct zclient *zclient, uint32_t chunk_size,
 			      uint32_t *start, uint32_t *end);
 extern int tm_release_table_chunk(struct zclient *zclient, uint32_t start,
 				  uint32_t end);
+
+extern int zclient_srv6_alloc_sid(struct zclient *zclient);
 
 extern int zebra_send_mpls_labels(struct zclient *zclient, int cmd,
 				  struct zapi_labels *zl);

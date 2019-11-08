@@ -398,6 +398,8 @@ void vtysh_config_parse_line(void *arg, const char *line)
 			config = config_get(PROTOCOL_NODE, line);
 		else if (strncmp(line, "mpls", strlen("mpls")) == 0)
 			config = config_get(MPLS_NODE, line);
+		else if (strncmp(line, "segment-routing-ipv6", strlen("segment-routing-ipv6")) == 0)
+			config = config_get(SRV6_NODE, line);
 		else if (strncmp(line, "bfd", strlen("bfd")) == 0)
 			config = config_get(BFD_NODE, line);
 		else {

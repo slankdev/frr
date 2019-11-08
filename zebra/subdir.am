@@ -12,6 +12,7 @@ vtysh_scan += \
 	$(top_srcdir)/zebra/rtadv.c \
 	$(top_srcdir)/zebra/zebra_mlag.c \
 	$(top_srcdir)/zebra/zebra_mpls_vty.c \
+	$(top_srcdir)/zebra/zebra_srv6_vty.c \
 	$(top_srcdir)/zebra/zebra_ptm.c \
 	$(top_srcdir)/zebra/zebra_pw.c \
 	$(top_srcdir)/zebra/zebra_routemap.c \
@@ -75,6 +76,9 @@ zebra_zebra_SOURCES = \
 	zebra/zebra_mpls_openbsd.c \
 	zebra/zebra_mpls_null.c \
 	zebra/zebra_mpls_vty.c \
+	zebra/zebra_srv6.c \
+	zebra/zebra_srv6_netlink.c \
+	zebra/zebra_srv6_vty.c \
 	zebra/zebra_mroute.c \
 	zebra/zebra_nhg.c \
 	zebra/zebra_ns.c \
@@ -95,7 +99,6 @@ zebra_zebra_SOURCES = \
 	zebra/table_manager.c \
 	zebra/zapi_msg.c \
 	zebra/zebra_errors.c \
-	zebra/zebra_seg6.c \
 	# end
 
 zebra/debug_clippy.c: $(CLIPPY_DEPS)
@@ -139,6 +142,7 @@ noinst_HEADERS += \
 	zebra/zebra_dplane.h \
 	zebra/zebra_memory.h \
 	zebra/zebra_mpls.h \
+	zebra/zebra_srv6.h \
 	zebra/zebra_mroute.h \
 	zebra/zebra_nhg.h \
 	zebra/zebra_ns.h \
@@ -158,7 +162,6 @@ noinst_HEADERS += \
 	zebra/table_manager.h \
 	zebra/zapi_msg.h \
 	zebra/zebra_errors.h \
-	zebra/zebra_seg6.h \
 	# end
 
 zebra_zebra_irdp_la_SOURCES = \

@@ -25,7 +25,7 @@
 
 #include "prefix.h"
 #include "mpls.h"
-#include "seg6.h"
+#include "srv6.h"
 
 #ifdef __cplusplus
 extern "C" {

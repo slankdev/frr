@@ -2931,12 +2931,25 @@ size_t bgp_packet_mpattr_start(struct stream *s, struct peer *peer, afi_t afi,
 			stream_putc(s, 4);
 			stream_put_ipv4(s, attr->nexthop.s_addr);
 			break;
-		case SAFI_MPLS_VPN:
-			stream_putc(s, 12);
-			stream_putl(s, 0); /* RD = 0, per RFC */
-			stream_putl(s, 0);
-			stream_put(s, &attr->mp_nexthop_global_in, 4);
+		case SAFI_MPLS_VPN: {
+			const struct bgp *bgp_vpn = bgp_get_default();
+			if (bgp_vpn->vpn_policy[AFI_IP].enable_srv6_vpn) {
+				stream_putc(s, 16);
+				struct in6_addr nh6;
+				inet_pton(AF_INET6, "2001:aa::1", &nh6);
+				for (size_t i=0; i<16; i++)
+					stream_putc(s, nh6.s6_addr[i]);
+				/* stream_putl(s, 0); #<{(| RD = 0, per RFC |)}># */
+				/* stream_putl(s, 0); */
+				/* stream_put_ipv6(s, &nh6, 16); */
+			} else {
+				stream_putc(s, 12);
+				stream_putl(s, 0); /* RD = 0, per RFC */
+				stream_putl(s, 0);
+				stream_put(s, &attr->mp_nexthop_global_in, 4);
+			}
 			break;
+		}
 		case SAFI_SRV6_VPN:
 			stream_putc(s, 12);
 			stream_putl(s, 0); /* RD = 0, per RFC */
@@ -3573,6 +3586,37 @@ bgp_size_t bgp_packet_attribute(struct bgp *bgp, struct peer *peer,
 		}
 	}
 
+	if (afi== AFI_IP && safi == SAFI_MPLS_VPN) {
+		struct bgp *bgp_vrf;
+		struct listnode *node, *nnode;
+		for (ALL_LIST_ELEMENTS(bm->bgp, node, nnode, bgp_vrf)) {
+			if (bgp_vrf->inst_type != BGP_INSTANCE_TYPE_VRF)
+				continue;
+
+			struct vpn_policy *pol = &bgp_vrf->vpn_policy[AFI_IP];
+			if (!pol->enable_srv6_vpn)
+				continue;
+
+			struct ecommunity *tovpn_ecom =
+				bgp_vrf->vpn_policy[AFI_IP]
+					.rtlist[BGP_SRV6VPN_POLICY_DIR_TOVPN];
+			if (!ecommunity_cmp(attr->ecommunity, tovpn_ecom))
+				continue;
+
+			struct in6_addr *sid = &pol->tovpn_sid;
+			stream_putc(s, BGP_ATTR_FLAG_OPTIONAL|BGP_ATTR_FLAG_TRANS);
+			stream_putc(s, BGP_ATTR_PREFIX_SID);
+			stream_putc(s, 24);       // tlv len
+			stream_putc(s, BGP_PREFIX_SID_SRV6_L3_SERVICE);
+			stream_putw(s, 21);       // sub-tlv len
+			stream_putc(s, 0);        // reserved
+			stream_put(s, sid, 16);   // sid_value
+			stream_putc(s, 0);        // sid_flags
+			stream_putw(s, 0xffff);   // endpoint_behaviour
+			stream_putc(s, 0);        // reserved
+		}
+	}
+
 	/* SRv6 Service Information Attribute. */
 	if (afi== AFI_IP && safi == SAFI_SRV6_VPN) {
 
@@ -3915,8 +3959,6 @@ void bgp_dump_routes_attr(struct stream *s, struct attr *attr,
 			stream_putw(s, 0); // flags
 			stream_putl(s, attr->label_index);
 		}
-		// TODO(slankdev): ????
-		zlog_debug("%s:%d:%s: SLANKDEV", __FILE__, __LINE__, __func__);
 	}
 
 	/* Return total size of attribute. */

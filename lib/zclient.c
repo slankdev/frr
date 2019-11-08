@@ -39,7 +39,7 @@
 #include "pbr.h"
 #include "nexthop_group.h"
 #include "lib_errors.h"
-#include "seg6.h"
+#include "srv6.h"
 
 #include <linux/seg6_local.h>
 
@@ -1002,6 +1002,12 @@ int zapi_route_encode(uint8_t cmd, struct stream *s, struct zapi_route *api)
 						   * sizeof(mpls_label_t));
 			}
 
+			if (CHECK_FLAG(api->message, ZAPI_MESSAGE_SEG6)) {
+				stream_putc(s, api_nh->sid_num);
+				for (size_t i=0; i<api_nh->sid_num; i++)
+					stream_put(s, &api_nh->sids[0], 16);
+			}
+
 			/* Router MAC for EVPN routes. */
 			if (CHECK_FLAG(api->flags, ZEBRA_FLAG_EVPN_ROUTE))
 				stream_put(s, &(api_nh->rmac),
@@ -1163,6 +1169,12 @@ int zapi_route_decode(struct stream *s, struct zapi_route *api)
 				STREAM_GET(&api_nh->labels[0], s,
 					   api_nh->label_num
 						   * sizeof(mpls_label_t));
+			}
+
+			if (CHECK_FLAG(api->message, ZAPI_MESSAGE_SEG6)) {
+				STREAM_GETC(s, api_nh->sid_num);
+				for (size_t i=0; i<api_nh->sid_num; i++)
+					STREAM_GET(&api_nh->sids[0], s, 16);
 			}
 
 			/* Router MAC for EVPN routes. */
@@ -3047,6 +3059,10 @@ static int zclient_read(struct thread *thread)
 			(*zclient->vxlan_sg_del)(command, zclient, length,
 						    vrf_id);
 		break;
+	case ZEBRA_SRV6_ALLOC_SID:
+		if (zclient->srv6_sid_alloc)
+			(*zclient->srv6_sid_alloc)(command, zclient, length, vrf_id);
+		break;
 	default:
 		break;
 	}
@@ -3163,3 +3179,14 @@ void zclient_interface_set_master(struct zclient *client,
 	stream_putw_at(s, 0, stream_get_endp(s));
 	zclient_send_message(client);
 }
+
+int zclient_srv6_alloc_sid(struct zclient *zclient)
+{
+	struct stream *s = zclient->obuf;
+	stream_reset(s);
+	zclient_create_header(s, ZEBRA_SRV6_ALLOC_SID, 0);
+	stream_putw_at(s, 0, stream_get_endp(s));
+	zclient_send_message(zclient);
+	return 0;
+}
+

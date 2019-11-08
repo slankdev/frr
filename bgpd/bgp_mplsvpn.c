@@ -296,6 +296,39 @@ void vpn_leak_zebra_vrf_label_update(struct bgp *bgp, afi_t afi)
 	bgp->vpn_policy[afi].tovpn_zebra_vrf_label_last_sent = label;
 }
 
+void vpn_leak_zebra_vrf_sid_update(struct bgp *bgp, afi_t afi)
+{
+	int debug = BGP_DEBUG(vpn, VPN_LEAK_LABEL);
+
+	if (bgp->vrf_id == VRF_UNKNOWN) {
+		if (debug) {
+			zlog_debug(
+				"%s: vrf %s: afi %s: vrf_id not set, "
+				"can't set zebra vrf label",
+				__func__, bgp->name_pretty, afi2str(afi));
+		}
+		return;
+	}
+
+	struct in6_addr sid;
+	memset(&sid, 0, sizeof(struct in6_addr));
+	if (vpn_leak_to_vpn_active(bgp, afi, NULL)) {
+		memcpy(&sid, &bgp->vpn_policy[afi].tovpn_sid, sizeof(struct in6_addr));
+	}
+
+	if (debug) {
+		char str[128];
+		inet_ntop(AF_INET6, &bgp->vpn_policy[afi].tovpn_sid, str, sizeof(str));
+		zlog_debug("%s: vrf %s: afi %s: setting sid %s for vrf id %d",
+			   __func__, bgp->name_pretty, afi2str(afi), str, bgp->vrf_id);
+	}
+
+	// TODO(slankdev):
+	struct vrf *vrf = bgp_vrf_lookup_by_instance_type(bgp);
+	zclient_send_vrf_seg6local_dx4(zclient, afi, &sid, vrf->data.l.table_id);
+	memcpy(&bgp->vpn_policy[afi].tovpn_zebra_vrf_sid_last_sent, &sid, sizeof(struct in6_addr));
+}
+
 /*
  * If zebra tells us vrf has become unconfigured, tell zebra not to
  * use this label to forward to the vrf anymore
@@ -457,6 +490,30 @@ static void setlabels(struct bgp_path_info *bpi,
 }
 
 /*
+ * make encoded route SIDs match specified encoded sid set
+ */
+static void setsids(struct bgp_path_info *bpi,
+		      struct in6_addr *sid, /* array of sids */
+		      uint32_t num_sids)
+{
+	if (num_sids)
+		assert(sid);
+	assert(num_sids <= BGP_MAX_SIDS);
+
+	if (!num_sids) {
+		if (bpi->extra)
+			bpi->extra->num_sids = 0;
+		return;
+	}
+
+	struct bgp_path_info_extra *extra = bgp_path_info_extra_get(bpi);
+	for (size_t i=0; i<num_sids; i++) {
+		memcpy(&extra->sid[i], &sid[i], 16);
+	}
+	extra->num_sids = num_sids;
+}
+
+/*
  * returns pointer to new bgp_path_info upon success
  */
 static struct bgp_path_info *
@@ -473,9 +530,13 @@ leak_update(struct bgp *bgp, /* destination bgp instance */
 	struct bgp_path_info *new;
 	char buf_prefix[PREFIX_STRLEN];
 
+	uint32_t num_sids = 0;
+	if (!sid_zero(&new_attr->sid))
+		num_sids = 1;
+
 	if (debug) {
 		prefix2str(&bn->p, buf_prefix, sizeof(buf_prefix));
-		zlog_debug("%s: entry: leak-to=%s, p=%s, type=%d, sub_type=%d",
+		zlog_debug(C_YEL "%s: " C_DEF "entry: leak-to=%s, p=%s, type=%d, sub_type=%d",
 			   __func__, bgp->name_pretty, buf_prefix,
 			   source_bpi->type, source_bpi->sub_type);
 	}
@@ -517,7 +578,7 @@ leak_update(struct bgp *bgp, /* destination bgp instance */
 			bgp_attr_unintern(&new_attr);
 			if (debug)
 				zlog_debug(
-					"%s: ->%s: %s: Found route, no change",
+					C_YEL "%s: " C_DEF "->%s: %s: Found route, no change",
 					__func__, bgp->name_pretty,
 					buf_prefix);
 			return NULL;
@@ -540,6 +601,9 @@ leak_update(struct bgp *bgp, /* destination bgp instance */
 		 */
 		if (!labelssame)
 			setlabels(bpi, label, num_labels);
+
+		if (num_sids)
+			setsids(bpi, &new_attr->sid , num_sids);
 
 		if (nexthop_self_flag)
 			bgp_path_info_set_flag(bn, bpi, BGP_PATH_ANNC_NH_SELF);
@@ -566,7 +630,7 @@ leak_update(struct bgp *bgp, /* destination bgp instance */
 							   afi, bpi, NULL, 0);
 
 		if (debug)
-			zlog_debug("%s: nexthop is %svalid (in vrf %s)",
+			zlog_debug(C_YEL "%s: " C_DEF "nexthop is %svalid (in vrf %s)",
 				__func__, (nh_valid ? "" : "not "),
 				bgp_nexthop->name_pretty);
 
@@ -579,7 +643,7 @@ leak_update(struct bgp *bgp, /* destination bgp instance */
 		bgp_unlock_node(bn);
 
 		if (debug)
-			zlog_debug("%s: ->%s: %s Found route, changed attr",
+			zlog_debug(C_YEL "%s: " C_DEF "->%s: %s Found route, changed attr",
 				   __func__, bgp->name_pretty, buf_prefix);
 
 		return bpi;
@@ -592,6 +656,9 @@ leak_update(struct bgp *bgp, /* destination bgp instance */
 		bgp_path_info_set_flag(bn, new, BGP_PATH_ANNC_NH_SELF);
 
 	bgp_path_info_extra_get(new);
+
+	if (num_sids)
+		setsids(new, &new_attr->sid , num_sids);
 
 	if (num_labels)
 		setlabels(new, label, num_labels);
@@ -631,7 +698,7 @@ leak_update(struct bgp *bgp, /* destination bgp instance */
 						afi, new, NULL, 0);
 
 	if (debug)
-		zlog_debug("%s: nexthop is %svalid (in vrf %s)",
+		zlog_debug(C_YEL "%s: " C_DEF "nexthop is %svalid (in vrf %s)",
 			__func__, (nh_valid ? "" : "not "),
 			bgp_nexthop->name_pretty);
 	if (nh_valid)
@@ -644,7 +711,7 @@ leak_update(struct bgp *bgp, /* destination bgp instance */
 	bgp_process(bgp, bn, afi, safi);
 
 	if (debug)
-		zlog_debug("%s: ->%s: %s: Added new route", __func__,
+		zlog_debug(C_YEL "%s: " C_DEF "->%s: %s: Added new route", __func__,
 			   bgp->name_pretty, buf_prefix);
 
 	return new;
@@ -698,7 +765,6 @@ void vpn_leak_from_vrf_update(struct bgp *bgp_vpn,	    /* to */
 				   bgp_vrf->name, debugmsg);
 		return;
 	}
-	zlog_debug("%s: not skipped", __func__);
 
 	bgp_attr_dup(&static_attr, path_vrf->attr); /* shallow copy */
 
@@ -847,6 +913,11 @@ void vpn_leak_from_vrf_update(struct bgp *bgp_vpn,	    /* to */
 	new_attr = bgp_attr_intern(
 		&static_attr);	/* hashed refcounted everything */
 	bgp_attr_flush(&static_attr); /* free locally-allocated parts */
+
+	struct in6_addr *tovpn_sid = &bgp_vrf->vpn_policy[afi].tovpn_sid;
+	if (sid_zero(tovpn_sid)) {
+		memcpy(&new_attr->sid, tovpn_sid, 16);
+	}
 
 	if (debug && new_attr->ecommunity) {
 		char *s = ecommunity_ecom2str(new_attr->ecommunity,

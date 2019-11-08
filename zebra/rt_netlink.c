@@ -1170,6 +1170,41 @@ static void _netlink_route_build_singlepath(const char *routedesc, int bytelen,
 		}
 	}
 
+	struct seg6_segs *nh_segs;
+	struct in6_addr out_segs[SRV6_MAX_SIDS];
+	int num_sids = 0;
+	char sid_buf[256];
+
+	nh_segs = nexthop->nh_seg6_segs;
+	for (size_t i = 0; nh_segs && i < nh_segs->num_segs; i++) {
+		if (IS_ZEBRA_DEBUG_KERNEL) {
+			char str[128];
+			sid2str(&nh_segs->segs[i], str, sizeof(str));
+			sprintf(sid_buf, "segs[%zd] %s", i, str);
+		}
+
+		sid_copy(&out_segs[num_labels], &nh_segs->segs[i]);
+		num_sids++;
+	}
+
+	if (num_sids) {
+		struct rtattr *nest;
+		uint16_t encap = LWTUNNEL_ENCAP_SEG6;
+		addattr_l(nlmsg, req_size, RTA_ENCAP_TYPE, &encap, sizeof(uint16_t));
+		nest = addattr_nest(nlmsg, req_size, RTA_ENCAP);
+
+		struct ipv6_sr_hdr *srh = parse_srh(false, num_sids, out_segs);
+		size_t srhlen = (srh->hdrlen + 1) << 3;
+		struct seg6_iptunnel_encap *tuninfo = malloc(sizeof(*tuninfo) + srhlen);
+		memset(tuninfo, 0, sizeof(*tuninfo) + srhlen);
+		memcpy(tuninfo->srh, srh, srhlen);
+		tuninfo->mode = SEG6_IPTUN_MODE_ENCAP;
+		addattr_l(nlmsg, req_size, SEG6_IPTUNNEL_SRH,
+				tuninfo, sizeof(*tuninfo) + srhlen);
+
+		addattr_nest_end(nlmsg, nest);
+	}
+
 	if (CHECK_FLAG(nexthop->flags, NEXTHOP_FLAG_ONLINK))
 		rtmsg->rtm_flags |= RTNH_F_ONLINK;
 
@@ -1190,8 +1225,8 @@ static void _netlink_route_build_singlepath(const char *routedesc, int bytelen,
 		if (IS_ZEBRA_DEBUG_KERNEL)
 			zlog_debug(
 				" 5549: _netlink_route_build_singlepath() (%s): "
-				"nexthop via %s %s if %u(%u)",
-				routedesc, ipv4_ll_buf, label_buf,
+				"nexthop via %s %s %s if %u(%u)",
+				routedesc, ipv4_ll_buf, label_buf, sid_buf,
 				nexthop->ifindex, nexthop->vrf_id);
 		return;
 	}
@@ -1360,6 +1395,13 @@ static void _netlink_route_build_multipath(const char *routedesc, int bytelen,
 			rta_nest_end(rta, nest);
 			rtnh->rtnh_len += rta->rta_len - len;
 		}
+	}
+
+	struct seg6_segs *nh_segs;
+	nh_segs = nexthop->nh_seg6_segs;
+	if (nh_segs->num_segs) {
+		zlog_debug("%s:%d:%s: this function isn't support yet",
+				__FILE__, __LINE__, __func__);
 	}
 
 	if (CHECK_FLAG(nexthop->flags, NEXTHOP_FLAG_ONLINK))
@@ -3075,10 +3117,6 @@ int netlink_mpls_multipath(int cmd, struct zebra_dplane_ctx *ctx)
 	/* Talk to netlink socket. */
 	return netlink_talk_info(netlink_talk_filter, &req.n,
 				 dplane_ctx_get_ns(ctx), 0);
-}
-
-int netlink_seg6_multipath(int cmd, struct zebra_dplane_ctx *ctx)
-{
 }
 
 #endif /* HAVE_NETLINK */
