@@ -3588,7 +3588,7 @@ bgp_size_t bgp_packet_attribute(struct bgp *bgp, struct peer *peer,
 			if (!ecommunity_cmp(attr->ecommunity, tovpn_ecom))
 				continue;
 
-			struct in6_addr *sid = &pol->tovpn_sid;
+			struct in6_addr *sid = &attr->sid;
 			stream_putc(s, BGP_ATTR_FLAG_OPTIONAL|BGP_ATTR_FLAG_TRANS);
 			stream_putc(s, BGP_ATTR_PREFIX_SID);
 			stream_putc(s, 24);       // tlv len
