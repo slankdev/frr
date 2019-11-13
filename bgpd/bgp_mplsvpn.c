@@ -346,10 +346,8 @@ void vpn_leak_zebra_vrf_sid_withdraw(struct bgp *bgp, afi_t afi)
 	}
 
 	struct in6_addr *sid = &bgp->vpn_policy[afi].tovpn_sid;
-	if (sid_zero(sid)) {
-		marker_debug_msg("ret sid_zero");
+	if (sid_zero(sid))
 		return;
-	}
 
 	if (debug) {
 		char str[128];
