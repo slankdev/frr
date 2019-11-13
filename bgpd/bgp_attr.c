@@ -41,6 +41,7 @@
 #include "bgpd/bgp_debug.h"
 #include "bgpd/bgp_errors.h"
 #include "bgpd/bgp_label.h"
+#include "bgpd/bgp_mplsvpn.h"
 #include "bgpd/bgp_packet.h"
 #include "bgpd/bgp_ecommunity.h"
 #include "bgpd/bgp_lcommunity.h"
@@ -3036,6 +3037,8 @@ void bgp_packet_mpattr_prefix(struct stream *s, afi_t afi, safi_t safi,
 	if (safi == SAFI_MPLS_VPN) {
 		if (addpath_encode)
 			stream_putl(s, addpath_tx_id);
+		if (bgp_get_default()->vpn_policy[AFI_IP].enable_srv6_vpn)
+			encode_label(MPLS_LABEL_IMPLICIT_NULL, label);
 		/* Label, RD, Prefix write. */
 		stream_putc(s, p->prefixlen + 88);
 		stream_put(s, label, BGP_LABEL_BYTES);
