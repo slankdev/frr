@@ -950,9 +950,8 @@ void vpn_leak_from_vrf_update(struct bgp *bgp_vpn,	    /* to */
 	bgp_attr_flush(&static_attr); /* free locally-allocated parts */
 
 	struct in6_addr *tovpn_sid = &bgp_vrf->vpn_policy[afi].tovpn_sid;
-	if (sid_zero(tovpn_sid)) {
+	if (!sid_zero(tovpn_sid))
 		memcpy(&new_attr->sid, tovpn_sid, 16);
-	}
 
 	if (debug && new_attr->ecommunity) {
 		char *s = ecommunity_ecom2str(new_attr->ecommunity,
