@@ -47,8 +47,8 @@ DEFUN (show_segment_routing_ipv6_sid,
        "SID Information\n")
 {
 	vty_out(vty, "Local SIDs:\n");
-	vty_out(vty, "Name                 ID      Prefix                   Owner        Status\n");
-	vty_out(vty, "-------------------- ------- ------------------------ ------------ -------\n");
+	vty_out(vty, " Name       Context              Prefix                   Owner        Status\n");
+	vty_out(vty, "---------- -------------------- ------------------------ ------------ -------\n");
 
 	for (size_t i=0; i<num_seg6local_sids(); i++) {
 		const struct seg6local_sid *sid = seg6local_sids[i];
@@ -63,8 +63,11 @@ DEFUN (show_segment_routing_ipv6_sid,
 		char sstr[128];
 		snprintf(sstr, 128, "inuse");
 
-		vty_out(vty, "%-20s %-7zd %-24s %-12s %s\n",
-				seg6local_action2str(sid->action), i, pstr, ostr, sstr);
+		char cstr[128];
+		snprintf_seg6local_context(cstr, 128, sid);
+
+		vty_out(vty, " %-10s %-20s %-24s %-12s %s\n",
+				seg6local_action2str(sid->action), cstr, pstr, ostr, sstr);
 	}
 	vty_out(vty, "\n");
 	return CMD_SUCCESS;

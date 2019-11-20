@@ -341,8 +341,46 @@ snprintf_seg6local_sid(char *str, size_t size,
 			buf, sid->plen, seg6local_action2str(sid->action));
 }
 
+int
+snprintf_seg6local_context(char *str, size_t size,
+		const struct seg6local_sid *sid)
+{
+	char b0[128];
+	memset(str, 0, size);
+	switch (sid->action) {
+
+		case SEG6_LOCAL_ACTION_END:
+			return snprintf(str, size, "USP");
+
+		case SEG6_LOCAL_ACTION_END_X:
+		case SEG6_LOCAL_ACTION_END_DX6:
+			inet_ntop(AF_INET6, &sid->context.nh6, b0, 128);
+			return snprintf(str, size, "nh6 %s", b0);
+
+		case SEG6_LOCAL_ACTION_END_DX4:
+			inet_ntop(AF_INET, &sid->context.nh4, b0, 128);
+			return snprintf(str, size, "nh4 %s", b0);
+
+		case SEG6_LOCAL_ACTION_END_T:
+		case SEG6_LOCAL_ACTION_END_DT6:
+		case SEG6_LOCAL_ACTION_END_DT4:
+			return snprintf(str, size, "table %u", sid->context.table);
+
+		case SEG6_LOCAL_ACTION_END_DX2:
+		case SEG6_LOCAL_ACTION_END_B6:
+		case SEG6_LOCAL_ACTION_END_B6_ENCAP:
+		case SEG6_LOCAL_ACTION_END_BM:
+		case SEG6_LOCAL_ACTION_END_S:
+		case SEG6_LOCAL_ACTION_END_AS:
+		case SEG6_LOCAL_ACTION_END_AM:
+		case SEG6_LOCAL_ACTION_UNSPEC:
+		default:
+			return snprintf(str, size, "unknown(%s)", __func__);
+	}
+}
+
 static int add_seg6local_sid(const struct in6_addr *pref,
-		uint32_t plen, uint32_t action, void *args, uint32_t owner)
+		uint32_t plen, uint32_t action, struct zapi_seg6local *api, uint32_t owner)
 {
 	struct seg6local_sid *sid =
 		(struct seg6local_sid*)malloc(sizeof(struct seg6local_sid));
@@ -350,6 +388,11 @@ static int add_seg6local_sid(const struct in6_addr *pref,
 	sid->plen = plen;
 	sid->action = action;
 	sid->owner = owner;
+
+	/* fill sid->context */
+	memcpy(&sid->context.nh4, &api->nh4, 4);
+	memcpy(&sid->context.nh6, &api->nh6, 16);
+	sid->context.table = api->table;
 
 	for (size_t i=0; i<MAX_SEG6LOCAL_SIDS; i++) {
 		if (!seg6local_sids[i])
@@ -420,7 +463,7 @@ void zebra_seg6local_add(ZAPI_HANDLER_ARGS)
 #endif
 
 	const uint32_t dummy_oif = 2;
-	add_seg6local_sid(&api.sid, api.plen, api.action, NULL, api.owner);
+	add_seg6local_sid(&api.sid, api.plen, api.action, &api, api.owner);
 	frr_with_privs(&zserv_privs) {
 		switch (api.action) {
 			case SEG6_LOCAL_ACTION_END:
