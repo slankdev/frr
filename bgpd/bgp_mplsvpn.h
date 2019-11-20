@@ -211,9 +211,6 @@ static inline void vpn_leak_prechange(vpn_policy_direction_t direction,
 	if (!bgp_vpn)
 		return;
 
-	if (bgp_vpn->vpn_policy[afi].enable_srv6_vpn)
-		bgp_vrf->vpn_policy[afi].enable_srv6_vpn = true;
-
 	if ((direction == BGP_VPN_POLICY_DIR_FROMVPN) &&
 		vpn_leak_from_vpn_active(bgp_vrf, afi, NULL)) {
 
@@ -233,9 +230,6 @@ static inline void vpn_leak_postchange(vpn_policy_direction_t direction,
 	/* Detect when default bgp instance is not (yet) defined by config */
 	if (!bgp_vpn)
 		return;
-
-	if (bgp_vpn->vpn_policy[afi].enable_srv6_vpn)
-		bgp_vrf->vpn_policy[afi].enable_srv6_vpn = true;
 
 	if (direction == BGP_VPN_POLICY_DIR_FROMVPN)
 		vpn_leak_to_vrf_update_all(bgp_vrf, bgp_vpn, afi);

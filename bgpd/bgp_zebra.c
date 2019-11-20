@@ -1064,8 +1064,7 @@ static int bgp_srv6_sid_alloc_callback(ZAPI_CALLBACK_ARGS)
 			continue;
 
 		struct vpn_policy *pol = &bgp_vrf->vpn_policy[AFI_IP];
-		bool enable_srv6_vpn = pol->enable_srv6_vpn;
-		if (!enable_srv6_vpn)
+		if (!bgp_get_default()->vpn_policy[AFI_IP].enable_srv6_vpn)
 			continue;
 
 		bool enable_sid_auto = CHECK_FLAG(pol->flags,
