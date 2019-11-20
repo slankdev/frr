@@ -45,18 +45,6 @@ extern struct zebra_privs_t zserv_privs;
 struct seg6local_sid *seg6local_sids[MAX_SEG6LOCAL_SIDS];
 static uint16_t sid_allocate_next = 0x10;
 
-static int zapi_seg6local_decode(struct stream *s, struct zapi_seg6local *api)
-{
-	STREAM_GETL(s, api->action);
-	STREAM_GETL(s, api->plen);
-	stream_get(&api->sid, s, 16);
-	stream_get(&api->nh4, s, 4);
-	stream_get(&api->nh6, s, 16);
-	STREAM_GETL(s, api->table);
-stream_failure:
-	return 0;
-}
-
 static int zapi_seg6_decode(struct stream *s, struct zapi_seg6 *api)
 {
 	STREAM_GETL(s, api->afi);
@@ -354,13 +342,14 @@ snprintf_seg6local_sid(char *str, size_t size,
 }
 
 static int add_seg6local_sid(const struct in6_addr *pref,
-		uint32_t plen, uint32_t action, void *args)
+		uint32_t plen, uint32_t action, void *args, uint32_t owner)
 {
 	struct seg6local_sid *sid =
 		(struct seg6local_sid*)malloc(sizeof(struct seg6local_sid));
 	memcpy(&sid->sid, pref, sizeof(struct in6_addr));
 	sid->plen = plen;
 	sid->action = action;
+	sid->owner = owner;
 
 	for (size_t i=0; i<MAX_SEG6LOCAL_SIDS; i++) {
 		if (!seg6local_sids[i])
@@ -431,7 +420,7 @@ void zebra_seg6local_add(ZAPI_HANDLER_ARGS)
 #endif
 
 	const uint32_t dummy_oif = 2;
-	add_seg6local_sid(&api.sid, api.plen, api.action, NULL);
+	add_seg6local_sid(&api.sid, api.plen, api.action, NULL, api.owner);
 	frr_with_privs(&zserv_privs) {
 		switch (api.action) {
 			case SEG6_LOCAL_ACTION_END:
@@ -582,7 +571,6 @@ void zebra_srv6_alloc_sid(ZAPI_HANDLER_ARGS)
 	const struct in6_addr *loc = &srv6->locator.prefix;
 	memcpy(&sid, loc, sizeof(struct in6_addr));
 	sid.s6_addr16[7] = htons(sid_allocate_next++);
-	add_seg6local_sid(&sid, 128, SEG6_LOCAL_ACTION_END_DX4, NULL);
 
 	char str[128];
 	inet_ntop(AF_INET6, &sid, str, 128);

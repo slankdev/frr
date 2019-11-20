@@ -406,7 +406,7 @@ void zclient_send_vrf_label(struct zclient *zclient, vrf_id_t vrf_id, afi_t afi,
 
 void zclient_send_vrf_seg6local_dx4(struct zclient *zclient,
 					 afi_t afi, struct in6_addr *sid, uint32_t vrf_table_id,
-					 bool install)
+					 bool install, uint32_t owner)
 {
 	vrf_id_t vrf_id = 0; /* global-vrf */
 	uint8_t nh4[4] = {169,254,99,(uint8_t)vrf_table_id};
@@ -417,6 +417,7 @@ void zclient_send_vrf_seg6local_dx4(struct zclient *zclient,
 	memcpy(&api.nh4, nh4, 4);
 	api.action = SEG6_LOCAL_ACTION_END_DX4;
 	api.plen = 128;
+	api.owner = owner;
 
 	struct stream *s = zclient->obuf;
 	stream_reset(s);
@@ -426,12 +427,7 @@ void zclient_send_vrf_seg6local_dx4(struct zclient *zclient,
 				: ZEBRA_SEG6LOCAL_DELETE,
 			vrf_id);
 
-	stream_putl(s, api.action);
-	stream_putl(s, api.plen);
-	stream_write(s, &api.sid, sizeof(struct in6_addr));
-	stream_write(s, &api.nh4, sizeof(struct in_addr));
-	stream_write(s, &api.nh6, sizeof(struct in6_addr));
-	stream_putl(s, api.table);
+	zapi_seg6local_encode(s, &api);
 
 	stream_putw_at(s, 0, stream_get_endp(s));
 	zclient_send_message(zclient);
@@ -889,6 +885,31 @@ static void zapi_nexthop_group_sort(struct zapi_nexthop *nh_grp,
 {
 	qsort(nh_grp, nexthop_num, sizeof(struct zapi_nexthop),
 	      &zapi_nexthop_cmp);
+}
+
+int zapi_seg6local_encode(struct stream *s, struct zapi_seg6local *api)
+{
+	stream_putl(s, api->action);
+	stream_putl(s, api->plen);
+	stream_write(s, &api->sid, sizeof(struct in6_addr));
+	stream_write(s, &api->nh4, sizeof(struct in_addr));
+	stream_write(s, &api->nh6, sizeof(struct in6_addr));
+	stream_putl(s, api->table);
+	stream_putl(s, api->owner);
+	return 0;
+}
+
+int zapi_seg6local_decode(struct stream *s, struct zapi_seg6local *api)
+{
+	STREAM_GETL(s, api->action);
+	STREAM_GETL(s, api->plen);
+	stream_get(&api->sid, s, 16);
+	stream_get(&api->nh4, s, 4);
+	stream_get(&api->nh6, s, 16);
+	STREAM_GETL(s, api->table);
+	STREAM_GETL(s, api->owner);
+stream_failure:
+	return 0;
 }
 
 int zapi_route_encode(uint8_t cmd, struct stream *s, struct zapi_route *api)

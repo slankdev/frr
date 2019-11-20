@@ -326,9 +326,9 @@ void vpn_leak_zebra_vrf_sid_update(struct bgp *bgp, afi_t afi)
 			   __func__, bgp->name_pretty, afi2str(afi), str, bgp->vrf_id);
 	}
 
-	// TODO(slankdev):
 	struct vrf *vrf = bgp_vrf_lookup_by_instance_type(bgp);
-	zclient_send_vrf_seg6local_dx4(zclient, afi, &sid, vrf->data.l.table_id, true);
+	zclient_send_vrf_seg6local_dx4(zclient, afi, &sid, vrf->data.l.table_id, true,
+			ZEBRA_ROUTE_BGP);
 	memcpy(&bgp->vpn_policy[afi].tovpn_zebra_vrf_sid_last_sent, &sid, sizeof(struct in6_addr));
 }
 
@@ -356,9 +356,9 @@ void vpn_leak_zebra_vrf_sid_withdraw(struct bgp *bgp, afi_t afi)
 			   __func__, bgp->name_pretty, afi2str(afi), str, bgp->vrf_id);
 	}
 
-	// TODO(slankdev):
 	struct vrf *vrf = bgp_vrf_lookup_by_instance_type(bgp);
-	zclient_send_vrf_seg6local_dx4(zclient, afi, sid, vrf->data.l.table_id, false);
+	zclient_send_vrf_seg6local_dx4(zclient, afi, sid, vrf->data.l.table_id, false,
+			ZEBRA_ROUTE_BGP);
 	memcpy(&bgp->vpn_policy[afi].tovpn_zebra_vrf_sid_last_sent, sid, sizeof(struct in6_addr));
 }
 

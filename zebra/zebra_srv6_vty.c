@@ -47,16 +47,24 @@ DEFUN (show_segment_routing_ipv6_sid,
        "SID Information\n")
 {
 	vty_out(vty, "Local SIDs:\n");
-	vty_out(vty, "Name                 ID      Prefix                   Status\n");
-	vty_out(vty, "-------------------- ------- ------------------------ -------\n");
+	vty_out(vty, "Name                 ID      Prefix                   Owner        Status\n");
+	vty_out(vty, "-------------------- ------- ------------------------ ------------ -------\n");
 
 	for (size_t i=0; i<num_seg6local_sids(); i++) {
 		const struct seg6local_sid *sid = seg6local_sids[i];
 		if (!sid) continue;
-		char str[128];
+		char str[128], pstr[128];
 		inet_ntop(AF_INET6, &sid->sid, str, sizeof(str));
-		vty_out(vty, "%-20s %-7zd %s/%u\n",
-				seg6local_action2str(sid->action), i, str, sid->plen);
+		snprintf(pstr, 128, "%s/%u", str, sid->plen);
+
+		uint32_t zroute_type = sid->owner;
+		const char *ostr = zebra_route_string(zroute_type);
+
+		char sstr[128];
+		snprintf(sstr, 128, "inuse");
+
+		vty_out(vty, "%-20s %-7zd %-24s %-12s %s\n",
+				seg6local_action2str(sid->action), i, pstr, ostr, sstr);
 	}
 	vty_out(vty, "\n");
 	return CMD_SUCCESS;

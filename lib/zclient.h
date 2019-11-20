@@ -454,6 +454,8 @@ struct zapi_seg6local {
 	struct in_addr nh4;
 	struct in6_addr nh6;
 	uint32_t table;
+
+	uint32_t owner;
 };
 
 static inline void
@@ -598,7 +600,7 @@ extern void zclient_send_vrf_label(struct zclient *zclient, vrf_id_t vrf_id,
 
 extern void zclient_send_vrf_seg6local_dx4(struct zclient *zclient,
 					 afi_t afi, struct in6_addr *sid, uint32_t vrf_table_id,
-					 bool install);
+					 bool install, uint32_t owner);
 
 extern void zclient_send_reg_requests(struct zclient *, vrf_id_t);
 extern void zclient_send_dereg_requests(struct zclient *, vrf_id_t);
@@ -746,6 +748,8 @@ bool zapi_rule_notify_decode(struct stream *s, uint32_t *seqno,
 bool zapi_ipset_notify_decode(struct stream *s,
 			      uint32_t *unique,
 			     enum zapi_ipset_notify_owner *note);
+extern int zapi_seg6local_encode(struct stream *s, struct zapi_seg6local *api);
+extern int zapi_seg6local_decode(struct stream *s, struct zapi_seg6local *api);
 
 #define ZEBRA_IPSET_NAME_SIZE   32
 
