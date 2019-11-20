@@ -129,7 +129,7 @@ static inline int vpn_leak_to_vpn_active(struct bgp *bgp_vrf, afi_t afi,
 		return 0;
 	}
 
-	bool enable_srv6_vpn = bgp_vrf->vpn_policy[afi].enable_srv6_vpn;
+	bool enable_srv6_vpn = bgp_get_default()->vpn_policy[afi].enable_srv6_vpn;
 	if (enable_srv6_vpn) {
 
 		/* Is there an "auto" export sid that isn't allocated yet? */

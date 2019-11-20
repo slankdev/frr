@@ -3581,7 +3581,7 @@ bgp_size_t bgp_packet_attribute(struct bgp *bgp, struct peer *peer,
 			if (bgp_vrf->inst_type != BGP_INSTANCE_TYPE_VRF)
 				continue;
 
-			struct vpn_policy *pol = &bgp_vrf->vpn_policy[AFI_IP];
+			struct vpn_policy *pol = &bgp_get_default()->vpn_policy[AFI_IP];
 			if (!pol->enable_srv6_vpn)
 				continue;
 
