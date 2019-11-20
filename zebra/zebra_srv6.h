@@ -73,5 +73,6 @@ extern void zebra_srv6_alloc_sid(ZAPI_HANDLER_ARGS);
 
 void zebra_srv6_init(void);
 void zebra_srv6_vty_init(void);
+void zebra_srv6_locator_init(const struct prefix_ipv6 *loc);
 
 #endif /* _QUAGGA_ZEBRA_SEG6_H */

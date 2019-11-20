@@ -163,9 +163,6 @@ DEFUN (locator_prefix,
 			 "Configure srv6 locator prefix\n"
 			 "Specify prefix\n")
 {
-	struct srv6 *srv6 = srv6_get_default();
-	srv6->is_enable = true;
-
 	struct prefix_ipv6 cp;
 	int ret = str2prefix_ipv6(argv[2]->arg, &cp);
 	if (ret <= 0) {
@@ -173,7 +170,7 @@ DEFUN (locator_prefix,
 		return CMD_WARNING_CONFIG_FAILED;
 	}
 
-	memcpy(&srv6->locator, &cp, sizeof(cp));
+	zebra_srv6_locator_init(&cp);
 	return CMD_SUCCESS;
 }
 

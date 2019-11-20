@@ -244,16 +244,6 @@ static void add_seg6local_end_dx4_route(
     uint32_t oif_idx, struct in_addr *nh4,
 		bool install)
 {
-#if 0
-	if (true) {
-		char str[128];
-		inet_ntop(AF_INET6, pref, str, 128);
-		marker_debug();
-		zlog_debug(C_YEL "%s: install=%s sid=%s" C_DEF,
-				__func__, install?"true":"false", str);
-	}
-#endif
-
 	int fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
   if (fd < 0)
     exit(1);
@@ -627,3 +617,26 @@ void zebra_srv6_alloc_sid(ZAPI_HANDLER_ARGS)
 
 	zserv_send_message(client, s);
 }
+
+void zebra_srv6_locator_init(
+		const struct prefix_ipv6 *loc)
+{
+	struct srv6 *srv6 = srv6_get_default();
+	srv6->is_enable = true;
+	memcpy(&srv6->locator, loc, sizeof(*loc));
+
+	/* Allocate End for SID-manager */
+	struct zapi_seg6local api = {0};
+	memcpy(&api.sid, &loc->prefix, 16);
+	api.sid.s6_addr16[7] = htons(1);
+	api.plen = 128;
+	api.action = SEG6_LOCAL_ACTION_END;
+	api.owner = ZEBRA_ROUTE_SYSTEM;
+	add_seg6local_sid(&api.sid, api.plen, api.action, &api, api.owner);
+
+	frr_with_privs(&zserv_privs) {
+		const uint32_t dummy_oif = 2;
+		add_seg6local_end_route(&api.sid, api.plen, dummy_oif, true);
+	}
+}
+
