@@ -47,27 +47,23 @@ DEFUN (show_segment_routing_ipv6_sid,
        "SID Information\n")
 {
 	vty_out(vty, "Local SIDs:\n");
-	vty_out(vty, " Name       Context              Prefix                   Owner        Status\n");
-	vty_out(vty, "---------- -------------------- ------------------------ ------------ -------\n");
+	vty_out(vty, " Name       Context              Prefix                   Owner      \n");
+	vty_out(vty, "---------- -------------------- ------------------------ ------------\n");
 
 	for (size_t i=0; i<num_seg6local_sids(); i++) {
 		const struct seg6local_sid *sid = seg6local_sids[i];
-		if (!sid) continue;
-		char str[128], pstr[128];
+		if (!sid)
+			continue;
+
+		const char *ostr;
+		char str[128], pstr[128], cstr[128];
 		inet_ntop(AF_INET6, &sid->sid, str, sizeof(str));
 		snprintf(pstr, 128, "%s/%u", str, sid->plen);
-
-		uint32_t zroute_type = sid->owner;
-		const char *ostr = zebra_route_string(zroute_type);
-
-		char sstr[128];
-		snprintf(sstr, 128, "inuse");
-
-		char cstr[128];
 		snprintf_seg6local_context(cstr, 128, sid);
+		ostr = zebra_route_string(sid->owner);
 
-		vty_out(vty, " %-10s %-20s %-24s %-12s %s\n",
-				seg6local_action2str(sid->action), cstr, pstr, ostr, sstr);
+		vty_out(vty, " %-10s %-20s %-24s %-12s\n",
+				seg6local_action2str(sid->action), cstr, pstr, ostr);
 	}
 	vty_out(vty, "\n");
 	return CMD_SUCCESS;
