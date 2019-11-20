@@ -7500,7 +7500,7 @@ static void bgp_config_write_family(struct vty *vty, struct bgp *bgp, afi_t afi,
 	bgp_config_write_maxpaths(vty, bgp, afi, safi);
 	bgp_config_write_table_map(vty, bgp, afi, safi);
 
-	if (safi == SAFI_MPLS_VPN)
+	if (afi == AFI_IP && safi == SAFI_MPLS_VPN)
 		if (bgp->vpn_policy[AFI_IP].enable_srv6_vpn)
 			vty_out(vty, "  segment-routing-ipv6\n");
 
