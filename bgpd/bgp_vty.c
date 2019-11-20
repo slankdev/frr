@@ -6530,10 +6530,6 @@ DEFPY (af_rd_vpn_export,
 	vpn_leak_prechange(BGP_VPN_POLICY_DIR_TOVPN, afi,
 			   bgp_get_default(), bgp);
 
-	struct bgp *bgp_vpn = bgp_get_default();
-	if (bgp_vpn->vpn_policy[afi].enable_srv6_vpn)
-		bgp->vpn_policy[afi].enable_srv6_vpn = true;
-
 	if (yes) {
 		bgp->vpn_policy[afi].tovpn_rd = prd;
 		SET_FLAG(bgp->vpn_policy[afi].flags,
