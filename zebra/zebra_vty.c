@@ -693,22 +693,6 @@ static void vty_show_ip_route(struct vty *vty, struct route_node *rn,
 						       nexthop->vrf_id));
 			break;
 
-		case NEXTHOP_TYPE_ENCAP:
-		{
-			if (nexthop->nh_seg6_segs && nexthop->nh_seg6_segs->num_segs) {
-				vty_out(vty, " encap seg6 mode %s segs %zd [",
-						nexthop->nh_seg6_mode == INLINE ? "inline" : "encap",
-						nexthop->nh_seg6_segs->num_segs);
-				size_t num_segs = nexthop->nh_seg6_segs->num_segs;
-				for (size_t i=0; i<num_segs; i++ ) {
-					char str[128];
-					inet_ntop(AF_INET6, &nexthop->nh_seg6_segs->segs[i], str, sizeof(str));
-					vty_out(vty, "%s%s", str, i+1<num_segs?" ":"");
-				}
-				vty_out(vty, "]");
-			}
-			break;
-		}
 		case NEXTHOP_TYPE_IFINDEX:
 			vty_out(vty, " is directly connected, %s",
 				ifindex2ifname(nexthop->ifindex,

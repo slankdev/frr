@@ -620,9 +620,7 @@ static int netlink_route_change_read_unicast(struct nlmsghdr *h, ns_id_t ns_id,
 			memset(&nh, 0, sizeof(nh));
 
 			if (bh_type == BLACKHOLE_UNSPEC) {
-				if (encap)
-					nh.type = NEXTHOP_TYPE_ENCAP;
-				else if (index && !gate)
+				if (index && !gate)
 					nh.type = NEXTHOP_TYPE_IFINDEX;
 				else if (index && gate)
 					nh.type =

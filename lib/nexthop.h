@@ -46,7 +46,6 @@ enum nexthop_types_t {
 	NEXTHOP_TYPE_IPV6,	 /* IPv6 nexthop.  */
 	NEXTHOP_TYPE_IPV6_IFINDEX, /* IPv6 nexthop with ifindex.  */
 	NEXTHOP_TYPE_BLACKHOLE,    /* Null0 nexthop.  */
-	NEXTHOP_TYPE_ENCAP, /* encap */
 };
 
 enum blackhole_type {

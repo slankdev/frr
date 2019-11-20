@@ -229,7 +229,7 @@ struct nexthop *route_entry_nexthop_encap_add(struct route_entry *re,
 	struct nexthop *nexthop;
 
 	nexthop = nexthop_new();
-	nexthop->type = NEXTHOP_TYPE_ENCAP;
+	nexthop->type = NEXTHOP_TYPE_IPV6;
 
 	nexthop->nh_seg6_mode = seg6_mode;
 	nexthop->nh_seg6_segs->num_segs = num_segs;
