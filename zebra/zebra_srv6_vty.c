@@ -178,9 +178,6 @@ DEFUN (locator_prefix,
 /* SRv6 SID configuration write function. */
 static int zebra_srv6_config(struct vty *vty)
 {
-	zlog_debug("----");
-	zlog_backtrace(0);
-	zlog_debug("----");
 	vty_out(vty, "!\n");
 	struct srv6 *srv6 = srv6_get_default();
 	if (srv6->is_enable) {
