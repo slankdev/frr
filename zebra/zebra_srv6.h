@@ -40,6 +40,8 @@ struct seg6local_sid {
 	uint32_t plen;
 
 	uint32_t action; /* SEG6_LOCAL_ACTION_{HOGE, END, END_X} */
+
+	uint32_t master; /* daemon-id bgpd,isisd,etc... */
 };
 
 #define MAX_SEG6LOCAL_SIDS 1024
