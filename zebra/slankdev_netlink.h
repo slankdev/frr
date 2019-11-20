@@ -9,7 +9,6 @@
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
 #include <linux/genetlink.h>
-#include "hexdump.h"
 
 #define GENL_REQUEST(_req, _bufsiz, _family, _hdrsiz, _ver, _cmd, _flags) \
 struct {                                                \

@@ -24,7 +24,6 @@
 #include "zebra/rtadv.h"
 #include "zebra/zebra_ptm.h"
 #include "zebra/zebra_mpls.h"
-#include "zebra/hexdump.h"
 #include "zebra/slankdev_netlink.h"
 
 extern struct zebra_privs_t zserv_privs;

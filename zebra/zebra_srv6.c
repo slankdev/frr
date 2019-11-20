@@ -116,7 +116,6 @@ static void adddel_in6_route(
   addattr_l(&req.n, sizeof(req), RTA_GATEWAY, nh6, sizeof(struct in6_addr));
 
   /* talk with netlink-bus */
-  /* hexdump(stdout, &req.n, req.n.nlmsg_len); */
   if (nl_talk(fd, &req.n, NULL, 0) < 0)
     exit(1);
 	close(fd);
@@ -178,7 +177,7 @@ static void adddel_in4_seg6_route(
   /* set RTA_ENCAP_TYPE */
   addattr16(&req.n, sizeof(req), RTA_ENCAP_TYPE, LWTUNNEL_ENCAP_SEG6);
 
-  hexdump(stdout, &req.n, req.n.nlmsg_len);
+  /* talk with netlink-bus */
   if (nl_talk(fd, &req.n, NULL, 0) < 0)
     exit(1);
 
@@ -232,7 +231,7 @@ static void add_seg6local_end_route(
   /* set RTA_ENCAP_TYPE */
   addattr16(&req.n, sizeof(req), RTA_ENCAP_TYPE, LWTUNNEL_ENCAP_SEG6_LOCAL);
 
-  hexdump(stdout, &req.n, req.n.nlmsg_len);
+  /* talk with netlink-bus */
   if (nl_talk(fd, &req.n, NULL, 0) < 0)
     exit(1);
 
@@ -288,7 +287,7 @@ static void add_seg6local_end_dx4_route(
   /* set RTA_ENCAP_TYPE */
   addattr16(&req.n, sizeof(req), RTA_ENCAP_TYPE, LWTUNNEL_ENCAP_SEG6_LOCAL);
 
-  hexdump(stdout, &req.n, req.n.nlmsg_len);
+  /* talk with netlink-bus */
   if (nl_talk(fd, &req.n, NULL, 0) < 0)
     exit(1);
 
@@ -573,6 +572,7 @@ void zebra_srv6_sid_route_delete(ZAPI_HANDLER_ARGS)
 
 void zebra_srv6_init()
 {
+	memset(seg6local_sids, 0, sizeof(seg6local_sids));
 }
 
 void zebra_srv6_get_locator(ZAPI_HANDLER_ARGS)

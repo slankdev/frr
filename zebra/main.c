@@ -250,8 +250,6 @@ FRR_DAEMON_INFO(
 /* Main startup routine. */
 int main(int argc, char **argv)
 {
-	memset(seg6local_sids, 0, sizeof(seg6local_sids));
-
 	// int batch_mode = 0;
 	char *zserv_path = NULL;
 	char *vrf_default_name_configured = NULL;
