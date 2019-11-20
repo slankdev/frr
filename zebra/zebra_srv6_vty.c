@@ -192,16 +192,6 @@ static int zebra_srv6_config(struct vty *vty)
 		vty_out(vty, "!\n");
 	}
 
-	vty_out(vty, "!\n");
-	for (size_t i=0; i<MAX_SEG6LOCAL_SIDS; i++) {
-		if (!seg6local_sids[i])
-			continue;
-		char str[128];
-		snprintf_seg6local_sid(str, sizeof(str), seg6local_sids[i]);
-		vty_out(vty, "%s\n", str);
-	}
-	vty_out(vty, "!\n");
-
 	return 0;
 }
 
