@@ -394,6 +394,7 @@ static void vty_show_ip_route(struct vty *vty, struct route_node *rn,
 			      struct route_entry *re, json_object *json,
 			      bool is_fib)
 {
+	marker_debug_msg("slankdev");
 	struct nexthop *nexthop;
 	int len = 0;
 	char buf[SRCDEST2STR_BUFFER];
