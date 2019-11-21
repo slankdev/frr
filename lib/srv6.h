@@ -58,6 +58,9 @@ seg6_mode2str(enum seg6_mode_t mode)
 	}
 }
 
+extern int snprintf_seg6_segs(char *str,
+		size_t size, const struct seg6_segs *segs);
+
 static inline bool sid_same(
 		const struct in6_addr *a,
 		const struct in6_addr *b)
