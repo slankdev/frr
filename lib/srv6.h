@@ -46,6 +46,12 @@ struct seg6_segs {
 	struct in6_addr segs[256];
 };
 
+struct seg6local_context {
+	struct in_addr nh4;
+	struct in6_addr nh6;
+	uint32_t table;
+};
+
 inline static const char*
 seg6_mode2str(enum seg6_mode_t mode)
 {
@@ -54,6 +60,32 @@ seg6_mode2str(enum seg6_mode_t mode)
 		case ENCAP  : return "ENCAP";
 		case L2ENCAP: return "L2ENCAP";
 		default:
+			abort();
+	}
+}
+
+inline static const char*
+seg6local_action2str(uint32_t action)
+{
+	switch (action) {
+		case SEG6_LOCAL_ACTION_END: return "End";
+		case SEG6_LOCAL_ACTION_END_X: return "End.X";
+		case SEG6_LOCAL_ACTION_END_T: return "End.T";
+		case SEG6_LOCAL_ACTION_END_DX2: return "End.DX2";
+		case SEG6_LOCAL_ACTION_END_DX6: return "End.DX6";
+		case SEG6_LOCAL_ACTION_END_DX4: return "End.DX4";
+		case SEG6_LOCAL_ACTION_END_DT6: return "End.DT6";
+		case SEG6_LOCAL_ACTION_END_DT4: return "End.DT4";
+		case SEG6_LOCAL_ACTION_END_B6: return "End.B6";
+		case SEG6_LOCAL_ACTION_END_B6_ENCAP: return "End.B6.Encap";
+		case SEG6_LOCAL_ACTION_END_BM: return "End.BM";
+		case SEG6_LOCAL_ACTION_END_S: return "End.S";
+		case SEG6_LOCAL_ACTION_END_AS: return "End.AS";
+		case SEG6_LOCAL_ACTION_END_AM: return "End.AM";
+
+		case SEG6_LOCAL_ACTION_UNSPEC:
+		default:
+			printf("ABORT...\n");
 			abort();
 	}
 }

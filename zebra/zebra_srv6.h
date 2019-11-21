@@ -40,11 +40,7 @@ struct seg6local_sid {
 	uint32_t plen;
 
 	uint32_t action; /* SEG6_LOCAL_ACTION_{HOGE, END, END_X} */
-	struct {
-		struct in_addr nh4;
-		struct in6_addr nh6;
-		uint32_t table;
-	} context;
+	struct seg6local_context context;
 
 	uint32_t owner; /* ZEBRA_ROUTE_HOGE BGP,ISIS,etc.. */
 };
@@ -52,7 +48,6 @@ struct seg6local_sid {
 #define MAX_SEG6LOCAL_SIDS 1024
 extern struct seg6local_sid *seg6local_sids[MAX_SEG6LOCAL_SIDS];
 
-extern const char* seg6local_action2str(uint32_t action);
 extern int snprintf_seg6local_sid(char *str,
 		size_t size, const struct seg6local_sid *sid);
 extern int snprintf_seg6local_context(char *str,

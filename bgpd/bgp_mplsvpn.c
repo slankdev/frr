@@ -328,7 +328,17 @@ void vpn_leak_zebra_vrf_sid_update(struct bgp *bgp, afi_t afi)
 
 	struct vrf *vrf = bgp_vrf_lookup_by_instance_type(bgp);
 	zclient_send_vrf_seg6local_dx4(zclient, afi, &sid, vrf->data.l.table_id, true,
-			ZEBRA_ROUTE_BGP);
+			ZEBRA_ROUTE_BGP); // TODO(slankdev): delete this line
+
+	struct prefix_ipv6 pref;
+	pref.family = AF_INET6;
+	pref.prefixlen = 128;
+	memcpy(&pref.prefix, &sid, 16);
+	struct seg6local_context ctx;
+	uint8_t tmp[4] = {169,254,99,vrf->data.l.table_id};
+	ctx.nh4.s_addr = *(uint32_t*)tmp;
+	bgp_zebra_srv6_sid_set(true, &pref, SEG6_LOCAL_ACTION_END_DX4, &ctx);
+
 	memcpy(&bgp->vpn_policy[afi].tovpn_zebra_vrf_sid_last_sent, &sid, sizeof(struct in6_addr));
 }
 
@@ -358,7 +368,17 @@ void vpn_leak_zebra_vrf_sid_withdraw(struct bgp *bgp, afi_t afi)
 
 	struct vrf *vrf = bgp_vrf_lookup_by_instance_type(bgp);
 	zclient_send_vrf_seg6local_dx4(zclient, afi, sid, vrf->data.l.table_id, false,
-			ZEBRA_ROUTE_BGP);
+			ZEBRA_ROUTE_BGP); // TODO(slankdev): delete this line
+
+	struct prefix_ipv6 pref;
+	pref.family = AF_INET6;
+	pref.prefixlen = 128;
+	memcpy(&pref.prefix, &sid, 16);
+	struct seg6local_context ctx;
+	uint8_t tmp[4] = {169,254,99,vrf->data.l.table_id};
+	ctx.nh4.s_addr = *(uint32_t*)tmp;
+	bgp_zebra_srv6_sid_set(false, &pref, SEG6_LOCAL_ACTION_END_DX4, &ctx);
+
 	memcpy(&bgp->vpn_policy[afi].tovpn_zebra_vrf_sid_last_sent, sid, sizeof(struct in6_addr));
 }
 

@@ -1046,6 +1046,24 @@ int bgp_srv6_sid_alloc(void)
 	return 0;
 }
 
+extern int bgp_zebra_srv6_sid_set(bool install,
+		const struct prefix_ipv6 *sid, uint32_t action,
+		const struct seg6local_context *ctx)
+{
+	marker_debug();
+	char buf[128];
+	zlog_debug("  intall: %s", install?"true":"false");
+	zlog_debug("  sid: %s", prefix2str(sid, buf, 128));
+	zlog_debug("  action: %s", seg6local_action2str(action));
+	zlog_debug("  ctx.nh4: %s", inet_ntop(AF_INET, &ctx->nh4, buf, 128));
+
+	uint32_t cmd = install ? ZEBRA_ROUTE_ADD : ZEBRA_ROUTE_DELETE;
+	struct zapi_route api;
+	// TODO(slankdev): impliment
+	//zclient_route_send(cmd, zclient, &api);
+	return 0;
+}
+
 static int bgp_srv6_sid_alloc_callback(ZAPI_CALLBACK_ARGS)
 {
 	int debug = BGP_DEBUG(vpn, VPN_LEAK_LABEL);
