@@ -1029,6 +1029,13 @@ int zapi_route_encode(uint8_t cmd, struct stream *s, struct zapi_route *api)
 					stream_put(s, &api_nh->sids[0], 16);
 			}
 
+			if (CHECK_FLAG(api->flags, ZEBRA_FLAG_SEG6LOCAL_ROUTE)) {
+				stream_putl(s, api_nh->seg6local_action);
+				stream_put(s, &api_nh->seg6local_ctx.nh4, 4);
+				stream_put(s, &api_nh->seg6local_ctx.nh6, 16);
+				stream_putl(s, api_nh->seg6local_ctx.table);
+			}
+
 			/* Router MAC for EVPN routes. */
 			if (CHECK_FLAG(api->flags, ZEBRA_FLAG_EVPN_ROUTE))
 				stream_put(s, &(api_nh->rmac),
@@ -1196,6 +1203,13 @@ int zapi_route_decode(struct stream *s, struct zapi_route *api)
 				STREAM_GETC(s, api_nh->sid_num);
 				for (size_t i=0; i<api_nh->sid_num; i++)
 					STREAM_GET(&api_nh->sids[0], s, 16);
+			}
+
+			if (CHECK_FLAG(api->flags, ZEBRA_FLAG_SEG6LOCAL_ROUTE)) {
+				STREAM_GETL(s, api_nh->seg6local_action);
+				STREAM_GET(&api_nh->seg6local_ctx.nh4, s, 4);
+				STREAM_GET(&api_nh->seg6local_ctx.nh6, s, 16);
+				STREAM_GETL(s, api_nh->seg6local_ctx.table);
 			}
 
 			/* Router MAC for EVPN routes. */

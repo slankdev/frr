@@ -33,7 +33,8 @@ extern void bgp_zebra_destroy(void);
 extern int bgp_srv6_sid_alloc(void);
 extern int bgp_zebra_srv6_sid_set(bool install,
 		const struct prefix_ipv6 *sid, uint32_t action,
-		const struct seg6local_context *ctx);
+		const struct seg6local_context *ctx,
+		const struct in6_addr *nh6);
 
 extern int bgp_zebra_get_table_range(uint32_t chunk_size,
 				     uint32_t *start, uint32_t *end);

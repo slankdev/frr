@@ -1203,6 +1203,28 @@ static void _netlink_route_build_singlepath(const char *routedesc, int bytelen,
 		addattr_nest_end(nlmsg, nest);
 	}
 
+	if (nexthop->seg6local_action != 0) {
+		uint32_t action = nexthop->seg6local_action;
+		const struct seg6local_context *ctx = &nexthop->seg6local_ctx;
+
+		if (action != SEG6_LOCAL_ACTION_END_DX4) {
+			zlog_err("%s: unsupport End behaviour action=%u", __func__, action);
+			return;
+		}
+
+		struct rtattr *nest;
+		uint16_t encap = LWTUNNEL_ENCAP_SEG6_LOCAL;
+		addattr_l(nlmsg, req_size, RTA_ENCAP_TYPE, &encap, sizeof(uint16_t));
+		nest = addattr_nest(nlmsg, req_size, RTA_ENCAP);
+		switch (nexthop->seg6local_action) {
+			case SEG6_LOCAL_ACTION_END_DX4:
+				addattr32(nlmsg, req_size, SEG6_LOCAL_ACTION, SEG6_LOCAL_ACTION_END_DX4);
+				addattr_l(nlmsg, req_size, SEG6_LOCAL_NH4, &ctx->nh4, sizeof(struct in_addr));
+				break;
+		}
+		addattr_nest_end(nlmsg, nest);
+	}
+
 	if (CHECK_FLAG(nexthop->flags, NEXTHOP_FLAG_ONLINK))
 		rtmsg->rtm_flags |= RTNH_F_ONLINK;
 
@@ -1719,6 +1741,7 @@ static int netlink_route_multipath(int cmd, struct zebra_dplane_ctx *ctx)
 
 		nexthop_num++;
 	}
+
 
 	/* Singlepath case. */
 	if (nexthop_num == 1) {

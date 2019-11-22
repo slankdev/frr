@@ -282,6 +282,21 @@ bool nexthop_same_no_labels(const struct nexthop *nh1,
 	return true;
 }
 
+void nexthop_add_seg6local(struct nexthop *nexthop,
+		uint32_t action, const struct seg6local_context *ctx)
+{
+	assert(action != 0);
+	nexthop->seg6local_action = action;
+	memcpy(&nexthop->seg6local_ctx, ctx, sizeof(struct seg6local_context));
+}
+
+void nexthop_del_seg6local(struct nexthop *nexthop)
+{
+	zlog_err("%s:%d:%s: This function isn't implemented",
+			__FILE__, __LINE__, __func__);
+	abort();
+}
+
 void nexthop_add_segs(struct nexthop *nexthop, int mode,
 		size_t num_segs, struct in6_addr *segs)
 {
@@ -290,6 +305,13 @@ void nexthop_add_segs(struct nexthop *nexthop, int mode,
 	segs_tmp->num_segs = num_segs;
 	memcpy(segs_tmp->segs, segs, num_segs * sizeof(struct in6_addr));
 	nexthop->nh_seg6_segs = segs_tmp;
+}
+
+void nexthop_del_segs(struct nexthop *nexthop)
+{
+	zlog_err("%s:%d:%s: This function isn't implemented",
+			__FILE__, __LINE__, __func__);
+	abort();
 }
 
 /* Update nexthop with label information. */
@@ -455,6 +477,12 @@ void nexthop_copy(struct nexthop *copy, const struct nexthop *nexthop,
 		nexthop_add_segs(copy, nexthop->nh_seg6_mode,
 				   nexthop->nh_seg6_segs->num_segs,
 				   &nexthop->nh_seg6_segs->segs[0]);
+
+	if (nexthop->seg6local_action != 0) {
+		nexthop_add_seg6local(copy,
+					nexthop->seg6local_action,
+					&nexthop->seg6local_ctx);
+	}
 }
 
 struct nexthop *nexthop_dup(const struct nexthop *nexthop,

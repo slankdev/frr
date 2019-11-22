@@ -90,6 +90,10 @@ seg6local_action2str(uint32_t action)
 	}
 }
 
+extern const char*
+seg6local_context2str(char *str, size_t size,
+		struct seg6local_context *ctx, uint32_t action);
+
 extern int snprintf_seg6_segs(char *str,
 		size_t size, const struct seg6_segs *segs);
 

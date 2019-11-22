@@ -221,6 +221,7 @@ struct vpn_policy {
 	bool enable_srv6_vpn;
 	struct in6_addr tovpn_sid;
 	struct in6_addr tovpn_zebra_vrf_sid_last_sent;
+	struct prefix_ipv6 sid_locator;
 };
 
 /*

@@ -513,8 +513,9 @@ void zebra_seg6_delete(ZAPI_HANDLER_ARGS)
 	}
 }
 
-void zebra_srv6_sid_route_add(ZAPI_HANDLER_ARGS)
+void zebra_srv6_sid_route_add(ZAPI_HANDLER_ARGS) //TODO(slankdev): delete
 {
+	abort();
 	struct zapi_seg6local api;
 	memset(&api, 0, sizeof(api));
 	zapi_seg6local_decode(msg, &api);
@@ -529,8 +530,9 @@ void zebra_srv6_sid_route_add(ZAPI_HANDLER_ARGS)
 	}
 }
 
-void zebra_srv6_sid_route_delete(ZAPI_HANDLER_ARGS)
+void zebra_srv6_sid_route_delete(ZAPI_HANDLER_ARGS) //TODO(slankdev): delete
 {
+	abort();
 	struct zapi_seg6local api;
 	memset(&api, 0, sizeof(api));
 	zapi_seg6local_decode(msg, &api);
@@ -588,6 +590,7 @@ void zebra_srv6_alloc_sid(ZAPI_HANDLER_ARGS)
 	struct stream *s = stream_new(ZEBRA_MAX_PACKET_SIZ);
 	zclient_create_header(s, ZEBRA_SRV6_ALLOC_SID, 0);
 	stream_put(s, &sid, 16);
+	stream_put(s, &srv6->locator, sizeof(struct prefix_ipv6));
 	stream_putw_at(s, 0, stream_get_endp(s));
 
 	zserv_send_message(client, s);

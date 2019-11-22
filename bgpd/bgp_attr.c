@@ -2259,10 +2259,6 @@ static bgp_attr_parse_ret_t bgp_attr_psid_sub(int32_t type,
 		}
 
 		/* Configure from Info */
-		struct in6_addr nh6;
-		const char *nh6_str = peer->host;
-		inet_pton(AF_INET6, nh6_str, &nh6);
-		bgp_zebra_srv6_sid_route_adddel(&sid_value, 128, &nh6, true);
 		memcpy(&attr->sid, &sid_value, 16);
 	}
 

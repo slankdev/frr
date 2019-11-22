@@ -1048,19 +1048,38 @@ int bgp_srv6_sid_alloc(void)
 
 extern int bgp_zebra_srv6_sid_set(bool install,
 		const struct prefix_ipv6 *sid, uint32_t action,
-		const struct seg6local_context *ctx)
+		const struct seg6local_context *ctx,
+		const struct in6_addr *nh6)
 {
-	marker_debug();
-	char buf[128];
-	zlog_debug("  intall: %s", install?"true":"false");
-	zlog_debug("  sid: %s", prefix2str(sid, buf, 128));
-	zlog_debug("  action: %s", seg6local_action2str(action));
-	zlog_debug("  ctx.nh4: %s", inet_ntop(AF_INET, &ctx->nh4, buf, 128));
+	if (true) {
+		char buf[128];
+		zlog_debug("%s: %s sid: %s %s %s",
+				__func__, install?"install":"uninstall",
+				prefix2str(sid, buf, 128), seg6local_action2str(action),
+				inet_ntop(AF_INET, &ctx->nh4, buf, 128));
+	}
+
+	struct zapi_route api;
+	memset(&api, 0, sizeof(api));
+	api.vrf_id = bgp_get_default()->vrf_id;
+	api.type = ZEBRA_ROUTE_BGP;
+	api.safi = SAFI_UNICAST;
+	api.prefix = *(struct prefix*)sid;
+	api.nexthop_num = 1;
+	SET_FLAG(api.flags, ZEBRA_FLAG_SEG6LOCAL_ROUTE);
+	SET_FLAG(api.message, ZAPI_MESSAGE_NEXTHOP);
+
+	struct zapi_nexthop *api_nh = &api.nexthops[0];
+	api_nh->type = NEXTHOP_TYPE_IPV6;
+	api_nh->vrf_id = 0;
+	api_nh->ifindex = IFINDEX_INTERNAL;
+	api_nh->onlink = false;
+	memcpy(&api_nh->gate.ipv6, nh6, 16);
+	api_nh->seg6local_action = action;
+	memcpy(&api_nh->seg6local_ctx, ctx, sizeof(*ctx));
 
 	uint32_t cmd = install ? ZEBRA_ROUTE_ADD : ZEBRA_ROUTE_DELETE;
-	struct zapi_route api;
-	// TODO(slankdev): impliment
-	//zclient_route_send(cmd, zclient, &api);
+	zclient_route_send(cmd, zclient, &api);
 	return 0;
 }
 
@@ -1069,8 +1088,10 @@ static int bgp_srv6_sid_alloc_callback(ZAPI_CALLBACK_ARGS)
 	int debug = BGP_DEBUG(vpn, VPN_LEAK_LABEL);
 
 	struct in6_addr sid;
+	struct prefix_ipv6 locator;
 	struct stream *s = zclient->ibuf;
 	STREAM_GET(&sid, s, 16);
+	STREAM_GET(&locator, s, sizeof(struct prefix_ipv6));
 
 	/*
 	 * Walk each-vrf and install alloced SID
@@ -1104,6 +1125,7 @@ static int bgp_srv6_sid_alloc_callback(ZAPI_CALLBACK_ARGS)
 		vpn_leak_prechange(BGP_VPN_POLICY_DIR_TOVPN,
 			AFI_IP, bgp_get_default(), bgp_vrf);
 		memcpy(&pol->tovpn_sid, &sid, 16);
+		memcpy(&pol->sid_locator, &locator, sizeof(struct prefix_ipv6));
 		vpn_leak_postchange(BGP_VPN_POLICY_DIR_TOVPN,
 			AFI_IP, bgp_get_default(), bgp_vrf);
 	}

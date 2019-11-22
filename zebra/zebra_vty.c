@@ -661,6 +661,10 @@ static void vty_show_ip_route(struct vty *vty, struct route_node *rn,
 						       json_segs);
 			}
 
+			if (nexthop->seg6local_action > 0) {
+				//TODO(slankdev): implement
+			}
+
 			json_object_array_add(json_nexthops, json_nexthop);
 		}
 
@@ -794,6 +798,14 @@ static void vty_show_ip_route(struct vty *vty, struct route_node *rn,
 			char buf[128];
 			snprintf_seg6_segs(buf, 128, nexthop->nh_seg6_segs);
 			vty_out(vty, ", seg6 [%s]", buf);
+		}
+
+		if (nexthop->seg6local_action > 0) {
+			char buf[128];
+			uint32_t action = nexthop->seg6local_action;
+			struct seg6local_context *ctx = &nexthop->seg6local_ctx;
+			seg6local_context2str(buf, 128, ctx, action);
+			vty_out(vty, ", seg6local %s %s", seg6local_action2str(action), buf);
 		}
 
 		if (uptime < ONE_DAY_SECOND)

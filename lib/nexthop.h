@@ -115,6 +115,10 @@ struct nexthop {
 	/* seg6 */
 	enum seg6_mode_t nh_seg6_mode;
 	struct seg6_segs *nh_seg6_segs;
+
+	/* seg6local */
+	uint32_t seg6local_action;
+	struct seg6local_context seg6local_ctx;
 };
 
 struct nexthop *nexthop_new(void);
@@ -128,6 +132,11 @@ void nexthop_del_labels(struct nexthop *);
 
 void nexthop_add_segs(struct nexthop *nh, int mode,
 		size_t num_segs, struct in6_addr *segs);
+void nexthop_del_segs(struct nexthop *);
+
+void nexthop_add_seg6local(struct nexthop *nexthop,
+		uint32_t action, const struct seg6local_context *ctx);
+void nexthop_del_seg6local(struct nexthop *);
 
 /*
  * Hash a nexthop. Suitable for use with hash tables.
