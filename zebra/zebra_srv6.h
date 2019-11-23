@@ -35,23 +35,12 @@ struct srv6 {
 };
 DECLARE_QOBJ_TYPE(srv6)
 
-struct seg6local_sid {
-	struct in6_addr sid;
-	uint32_t plen;
-
-	uint32_t action; /* SEG6_LOCAL_ACTION_{HOGE, END, END_X} */
-	struct seg6local_context context;
-
-	uint32_t owner; /* ZEBRA_ROUTE_HOGE BGP,ISIS,etc.. */
-};
-
+extern void zebra_srv6_init(void);
+extern void zebra_srv6_vty_init(void);
+extern void zebra_srv6_locator_init(const struct prefix_ipv6 *loc);
 extern struct srv6 *srv6_get_default(void);
 
 extern void zebra_srv6_get_locator(ZAPI_HANDLER_ARGS);
 extern void zebra_srv6_alloc_sid(ZAPI_HANDLER_ARGS);
-
-void zebra_srv6_init(void);
-void zebra_srv6_vty_init(void);
-void zebra_srv6_locator_init(const struct prefix_ipv6 *loc);
 
 #endif /* _QUAGGA_ZEBRA_SEG6_H */

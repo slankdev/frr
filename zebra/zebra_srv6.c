@@ -97,6 +97,29 @@ void zebra_srv6_init()
 {
 }
 
+void zebra_srv6_locator_init(
+		const struct prefix_ipv6 *loc)
+{
+	struct srv6 *srv6 = srv6_get_default();
+	srv6->is_enable = true;
+	memcpy(&srv6->locator, loc, sizeof(*loc));
+
+	/* Allocate End for SID-manager */
+	struct zapi_seg6local api = {0};
+	memcpy(&api.sid, &loc->prefix, 16);
+	api.sid.s6_addr16[7] = htons(1);
+	api.plen = 128;
+	api.action = SEG6_LOCAL_ACTION_END;
+	api.owner = ZEBRA_ROUTE_SYSTEM;
+
+	struct prefix p;
+	memset(&p, 0, sizeof(p));
+	memcpy(&p.u.prefix6, &api.sid, 16);
+	p.family = AF_INET6;
+	p.prefixlen = 128;
+	seg6local_add_end(&p);
+}
+
 void zebra_srv6_get_locator(ZAPI_HANDLER_ARGS)
 {
 	struct srv6 *srv6 = srv6_get_default();
@@ -138,27 +161,4 @@ void zebra_srv6_alloc_sid(ZAPI_HANDLER_ARGS)
 	stream_putw_at(s, 0, stream_get_endp(s));
 
 	zserv_send_message(client, s);
-}
-
-void zebra_srv6_locator_init(
-		const struct prefix_ipv6 *loc)
-{
-	struct srv6 *srv6 = srv6_get_default();
-	srv6->is_enable = true;
-	memcpy(&srv6->locator, loc, sizeof(*loc));
-
-	/* Allocate End for SID-manager */
-	struct zapi_seg6local api = {0};
-	memcpy(&api.sid, &loc->prefix, 16);
-	api.sid.s6_addr16[7] = htons(1);
-	api.plen = 128;
-	api.action = SEG6_LOCAL_ACTION_END;
-	api.owner = ZEBRA_ROUTE_SYSTEM;
-
-	struct prefix p;
-	memset(&p, 0, sizeof(p));
-	memcpy(&p.u.prefix6, &api.sid, 16);
-	p.family = AF_INET6;
-	p.prefixlen = 128;
-	seg6local_add_end(&p);
 }
