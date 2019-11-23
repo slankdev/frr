@@ -25,7 +25,8 @@
 #include "stream.h"
 #include "zebra/zserv.h"
 #include "zebra/zebra_srv6.h"
-#include "zebra/slankdev_netlink.h"
+#include "zebra/zebra_memory.h"
+#include "zebra/zebra_errors.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -45,58 +46,42 @@ extern struct zebra_privs_t zserv_privs;
 struct seg6local_sid *seg6local_sids[MAX_SEG6LOCAL_SIDS];
 static uint16_t sid_allocate_next = 0x10;
 
-static void add_seg6local_end_route(
-    struct in6_addr *pref, uint32_t plen,
-    uint32_t oif_idx, bool install)
+static void seg6local_add_end(struct prefix *prefix)
 {
-	int fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE);
-  if (fd < 0)
-    exit(1);
+	struct route_entry *re = XCALLOC(MTYPE_RE, sizeof(struct route_entry));
+	re->type = ZEBRA_ROUTE_STATIC;
+	re->instance = 0;
+	SET_FLAG(re->flags, ZEBRA_FLAG_SEG6LOCAL_ROUTE);
+	re->uptime = monotime(NULL);
+	re->vrf_id = VRF_DEFAULT;
+	re->table = RT_TABLE_MAIN;
 
-  struct {
-    struct nlmsghdr  n;
-    struct rtmsg r;
-    char buf[4096];
-  } req = {
-    .n.nlmsg_len = NLMSG_LENGTH(sizeof(struct rtmsg)),
-    .n.nlmsg_flags = NLM_F_REQUEST | NLM_F_CREATE | NLM_F_EXCL | NLM_F_ACK,
-    .n.nlmsg_type = install ? RTM_NEWROUTE : RTM_DELROUTE,
-    .r.rtm_family = AF_INET6,
-    .r.rtm_dst_len = plen,
-    .r.rtm_src_len = 0,
-    .r.rtm_tos = 0,
-    .r.rtm_table = RT_TABLE_MAIN,
-    .r.rtm_protocol = 0x03,
-    .r.rtm_scope = 0xfd,
-    .r.rtm_type = RTN_UNICAST,
-    .r.rtm_flags = 0,
-  };
+	struct in6_addr ipv6;
+	memset(&ipv6, 0, sizeof(ipv6));
+	ifindex_t ifindex = 2; //TODO(slankdev): this dummy number.... :(
 
-  /* set RTA_DST */
-  addattr_l(&req.n, sizeof(req), RTA_DST, pref, sizeof(struct in6_addr));
-  req.r.rtm_dst_len = plen;
+	struct nexthop *nexthop =
+		route_entry_nexthop_ifindex_add(
+			re, ifindex, VRF_DEFAULT);
 
-  /* set RTA_OIF */
-  addattr32(&req.n, sizeof(req), RTA_OIF, oif_idx);
+	if (!nexthop) {
+			flog_warn(
+				EC_ZEBRA_NEXTHOP_CREATION_FAILED,
+				"%s: Nexthops Specified: but we failed to properly create one",
+				__PRETTY_FUNCTION__);
+		nexthops_free(re->ng.nexthop);
+		XFREE(MTYPE_RE, re);
+		return;
+	}
 
-  /* set RTA_ENCAP */
-  char buf[1024];
-  struct rtattr *rta = (void *)buf;
-  rta->rta_type = RTA_ENCAP;
-  rta->rta_len = RTA_LENGTH(0);
-  struct rtattr *nest = rta_nest(rta, sizeof(buf), RTA_ENCAP);
-  rta_addattr32(rta, sizeof(buf), SEG6_LOCAL_ACTION, SEG6_LOCAL_ACTION_END);
-  rta_nest_end(rta, nest);
-  addraw_l(&req.n, 1024 , RTA_DATA(rta), RTA_PAYLOAD(rta));
+	struct seg6local_context ctx;
+	memset(&ctx, 0, sizeof(ctx));
+	nexthop_add_seg6local(nexthop, SEG6_LOCAL_ACTION_END, &ctx);
 
-  /* set RTA_ENCAP_TYPE */
-  addattr16(&req.n, sizeof(req), RTA_ENCAP_TYPE, LWTUNNEL_ENCAP_SEG6_LOCAL);
-
-  /* talk with netlink-bus */
-  if (nl_talk(fd, &req.n, NULL, 0) < 0)
-    exit(1);
-
-	close(fd);
+	int ret = rib_add_multipath(AFI_IP6, SAFI_UNICAST, prefix, NULL, re);
+	if (ret < 0)  {
+		zlog_err("%s: can't add RE entry to rib", __func__);
+	}
 }
 
 int
@@ -261,9 +246,10 @@ void zebra_srv6_locator_init(
 	api.owner = ZEBRA_ROUTE_SYSTEM;
 	add_seg6local_sid(&api.sid, api.plen, api.action, &api, api.owner);
 
-	frr_with_privs(&zserv_privs) {
-		const uint32_t dummy_oif = 2;
-		add_seg6local_end_route(&api.sid, api.plen, dummy_oif, true);
-	}
+	struct prefix p;
+	memset(&p, 0, sizeof(p));
+	memcpy(&p.u.prefix6, &api.sid, 16);
+	p.family = AF_INET6;
+	p.prefixlen = 128;
+	seg6local_add_end(&p);
 }
-
