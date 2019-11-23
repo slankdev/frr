@@ -42,8 +42,6 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-extern struct zebra_privs_t zserv_privs;
-struct seg6local_sid *seg6local_sids[MAX_SEG6LOCAL_SIDS];
 static uint16_t sid_allocate_next = 0x10;
 
 static void seg6local_add_end(struct prefix *prefix)
@@ -133,58 +131,8 @@ snprintf_seg6local_context(char *str, size_t size,
 	}
 }
 
-static int add_seg6local_sid(const struct in6_addr *pref,
-		uint32_t plen, uint32_t action, struct zapi_seg6local *api, uint32_t owner)
-{
-	struct seg6local_sid *sid =
-		(struct seg6local_sid*)malloc(sizeof(struct seg6local_sid));
-	memcpy(&sid->sid, pref, sizeof(struct in6_addr));
-	sid->plen = plen;
-	sid->action = action;
-	sid->owner = owner;
-
-	/* fill sid->context */
-	memcpy(&sid->context.nh4, &api->nh4, 4);
-	memcpy(&sid->context.nh6, &api->nh6, 16);
-	sid->context.table = api->table;
-
-	for (size_t i=0; i<MAX_SEG6LOCAL_SIDS; i++) {
-		if (!seg6local_sids[i])
-			continue;
-
-		if ((seg6local_sids[i]->plen == plen)
-		 && (memcmp(&seg6local_sids[i]->sid, pref, plen) == 0)) {
-			struct seg6local_sid *tmp = seg6local_sids[i];
-			seg6local_sids[i] = sid;
-			free(tmp);
-			return i;
-		}
-	}
-
-	for (size_t i=0; i<MAX_SEG6LOCAL_SIDS; i++) {
-		if (!seg6local_sids[i]) {
-			seg6local_sids[i] = sid;
-			return i;
-		}
-	}
-
-	free(sid);
-	return -1;
-}
-
-size_t num_seg6local_sids(void)
-{
-	size_t num = 0;
-	for (size_t i=0; i<MAX_SEG6LOCAL_SIDS; i++) {
-		if (seg6local_sids[i])
-			num ++;
-	}
-	return num;
-}
-
 void zebra_srv6_init()
 {
-	memset(seg6local_sids, 0, sizeof(seg6local_sids));
 }
 
 void zebra_srv6_get_locator(ZAPI_HANDLER_ARGS)
@@ -244,7 +192,6 @@ void zebra_srv6_locator_init(
 	api.plen = 128;
 	api.action = SEG6_LOCAL_ACTION_END;
 	api.owner = ZEBRA_ROUTE_SYSTEM;
-	add_seg6local_sid(&api.sid, api.plen, api.action, &api, api.owner);
 
 	struct prefix p;
 	memset(&p, 0, sizeof(p));
