@@ -86,9 +86,6 @@ extern int bgp_zebra_advertise_all_vni(struct bgp *, int);
 extern int bgp_zebra_dup_addr_detection(struct bgp *bgp);
 extern int bgp_zebra_vxlan_flood_control(struct bgp *bgp,
 					 enum vxlan_flood_control flood_ctrl);
-extern int bgp_zebra_srv6_sid_route_adddel(
-					 struct in6_addr *pref, uint32_t plen,
-					 struct in6_addr *nh6, bool add);
 
 extern int bgp_zebra_num_connects(void);
 

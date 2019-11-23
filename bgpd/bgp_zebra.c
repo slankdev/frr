@@ -2011,35 +2011,6 @@ void bgp_zebra_terminate_radv(struct bgp *bgp, struct peer *peer)
 	zclient_send_interface_radv_req(zclient, bgp->vrf_id, peer->ifp, 0, 0);
 }
 
-int bgp_zebra_srv6_sid_route_adddel(
-		struct in6_addr *pref, uint32_t plen,
-		struct in6_addr *nh6, bool add)
-{
-	struct zapi_seg6local api;
-	memset(&api, 0, sizeof(api));
-	memcpy(&api.sid, pref, sizeof(struct in6_addr));
-	memcpy(&api.nh6, nh6, sizeof(struct in6_addr));
-	api.plen = plen;
-
-	vrf_id_t vrf_id = 0; /* global vrf */
-	struct stream *s = zclient->obuf;
-	stream_reset(s);
-	zclient_create_header(s,
-			add ? ZEBRA_SRV6_SID_ROUTE_ADD :
-			ZEBRA_SRV6_SID_ROUTE_DELETE, vrf_id);
-
-	stream_putl(s, api.action);
-	stream_putl(s, api.plen);
-	stream_write(s, &api.sid, sizeof(struct in6_addr));
-	stream_write(s, &api.nh4, sizeof(struct in_addr));
-	stream_write(s, &api.nh6, sizeof(struct in6_addr));
-	stream_putl(s, api.table);
-
-	stream_putw_at(s, 0, stream_get_endp(s));
-	zclient_send_message(zclient);
-	return 0;
-}
-
 int bgp_zebra_advertise_subnet(struct bgp *bgp, int advertise, vni_t vni)
 {
 	struct stream *s = NULL;
