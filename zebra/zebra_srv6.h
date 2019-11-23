@@ -56,13 +56,6 @@ extern int snprintf_seg6local_context(char *str,
 extern size_t num_seg6local_sids(void);
 extern struct srv6 *srv6_get_default(void);
 
-extern void zebra_seg6local_add(ZAPI_HANDLER_ARGS);
-extern void zebra_seg6local_delete(ZAPI_HANDLER_ARGS);
-extern void zebra_seg6_add(ZAPI_HANDLER_ARGS);
-extern void zebra_seg6_delete(ZAPI_HANDLER_ARGS);
-
-extern void zebra_srv6_sid_route_add(ZAPI_HANDLER_ARGS);
-extern void zebra_srv6_sid_route_delete(ZAPI_HANDLER_ARGS);
 extern void zebra_srv6_get_locator(ZAPI_HANDLER_ARGS);
 extern void zebra_srv6_alloc_sid(ZAPI_HANDLER_ARGS);
 

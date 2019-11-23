@@ -2580,8 +2580,6 @@ void (*zserv_handlers[])(ZAPI_HANDLER_ARGS) = {
 	[ZEBRA_IPTABLE_DELETE] = zread_iptable,
 	[ZEBRA_VXLAN_FLOOD_CONTROL] = zebra_vxlan_flood_control,
 	[ZEBRA_VXLAN_SG_REPLAY] = zebra_vxlan_sg_replay,
-	[ZEBRA_SEG6LOCAL_ADD] = zebra_seg6local_add,
-	[ZEBRA_SEG6LOCAL_DELETE] = zebra_seg6local_delete,
 	[ZEBRA_SRV6_GET_LOCATOR] = zebra_srv6_get_locator,
 	[ZEBRA_SRV6_ALLOC_SID] = zebra_srv6_alloc_sid,
 };

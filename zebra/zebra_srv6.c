@@ -187,24 +187,6 @@ static int add_seg6local_sid(const struct in6_addr *pref,
 	return -1;
 }
 
-static int del_seg6local_sid(const struct in6_addr *pref,
-		uint32_t plen, uint32_t action, void *args)
-{
-	for (size_t i=0; i<MAX_SEG6LOCAL_SIDS; i++) {
-		if (!seg6local_sids[i])
-			continue;
-
-		if ((seg6local_sids[i]->plen == plen)
-		 && (memcmp(&seg6local_sids[i]->sid, pref, plen) == 0)) {
-			struct seg6local_sid *tmp = seg6local_sids[i];
-			free(tmp);
-			return i;
-		}
-	}
-
-	return -1;
-}
-
 size_t num_seg6local_sids(void)
 {
 	size_t num = 0;
@@ -213,67 +195,6 @@ size_t num_seg6local_sids(void)
 			num ++;
 	}
 	return num;
-}
-
-void zebra_seg6local_add(ZAPI_HANDLER_ARGS)
-{
-	struct zapi_seg6local api;
-	struct stream *s = msg;
-	memset(&api, 0, sizeof(struct zapi_seg6local));
-	if (zapi_seg6local_decode(s, &api) < 0) {
-		printf("%s: Unable to decode zapi_route sent",
-				 __PRETTY_FUNCTION__);
-		return;
-	}
-
-#if 1
-	/* DUMP API structure */
-	zapi_seg6local_dump(stdout, &api);
-#endif
-
-	const uint32_t dummy_oif = 2;
-	add_seg6local_sid(&api.sid, api.plen, api.action, &api, api.owner);
-	frr_with_privs(&zserv_privs) {
-		switch (api.action) {
-			case SEG6_LOCAL_ACTION_END:
-				add_seg6local_end_route(&api.sid, api.plen, dummy_oif, true);
-				break;
-			default:
-				abort();
-				break;
-		}
-	}
-}
-
-void zebra_seg6local_delete(ZAPI_HANDLER_ARGS)
-{
-	struct zapi_seg6local api;
-	struct stream *s = msg;
-	memset(&api, 0, sizeof(struct zapi_seg6local));
-	if (zapi_seg6local_decode(s, &api) < 0) {
-		printf("%s: Unable to decode zapi_route sent",
-				 __PRETTY_FUNCTION__);
-		return;
-	}
-
-#if 1
-	/* DUMP API structure */
-	zapi_seg6local_dump(stdout, &api);
-#endif
-
-	del_seg6local_sid(&api.sid, api.plen, 0, NULL);
-
-	const uint32_t dummy_oif = 2;
-	frr_with_privs(&zserv_privs) {
-		switch (api.action) {
-			case SEG6_LOCAL_ACTION_END:
-				add_seg6local_end_route(&api.sid, api.plen, dummy_oif, false);
-				break;
-			default:
-				abort();
-				break;
-		}
-	}
 }
 
 void zebra_srv6_init()
