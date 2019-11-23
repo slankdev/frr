@@ -45,11 +45,6 @@ struct seg6local_sid {
 	uint32_t owner; /* ZEBRA_ROUTE_HOGE BGP,ISIS,etc.. */
 };
 
-extern int snprintf_seg6local_sid(char *str,
-		size_t size, const struct seg6local_sid *sid);
-extern int snprintf_seg6local_context(char *str,
-		size_t size, const struct seg6local_sid *sid);
-
 extern struct srv6 *srv6_get_default(void);
 
 extern void zebra_srv6_get_locator(ZAPI_HANDLER_ARGS);

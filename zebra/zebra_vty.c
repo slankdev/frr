@@ -2969,17 +2969,6 @@ static int config_write_forwarding(struct vty *vty)
 	return 0;
 }
 
-struct srv6 *srv6_get_default(void)
-{
-	static struct srv6 srv6;
-	static bool first_execution = true;
-	if (first_execution) {
-		srv6.is_enable = false;
-		first_execution = false;
-	}
-	return &srv6;
-}
-
 DEFUN_HIDDEN (show_frr,
 	      show_frr_cmd,
 	      "show frr",

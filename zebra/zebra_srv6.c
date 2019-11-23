@@ -82,53 +82,15 @@ static void seg6local_add_end(struct prefix *prefix)
 	}
 }
 
-int
-snprintf_seg6local_sid(char *str, size_t size,
-		const struct seg6local_sid *sid)
+struct srv6 *srv6_get_default(void)
 {
-	char buf[128];
-	inet_ntop(AF_INET6, &sid->sid, buf, sizeof(buf));
-	return snprintf(str, size,
-			"ipv6 route %s/%u encap seg6local action %s",
-			buf, sid->plen, seg6local_action2str(sid->action));
-}
-
-int
-snprintf_seg6local_context(char *str, size_t size,
-		const struct seg6local_sid *sid)
-{
-	char b0[128];
-	memset(str, 0, size);
-	switch (sid->action) {
-
-		case SEG6_LOCAL_ACTION_END:
-			return snprintf(str, size, "USP");
-
-		case SEG6_LOCAL_ACTION_END_X:
-		case SEG6_LOCAL_ACTION_END_DX6:
-			inet_ntop(AF_INET6, &sid->context.nh6, b0, 128);
-			return snprintf(str, size, "nh6 %s", b0);
-
-		case SEG6_LOCAL_ACTION_END_DX4:
-			inet_ntop(AF_INET, &sid->context.nh4, b0, 128);
-			return snprintf(str, size, "nh4 %s", b0);
-
-		case SEG6_LOCAL_ACTION_END_T:
-		case SEG6_LOCAL_ACTION_END_DT6:
-		case SEG6_LOCAL_ACTION_END_DT4:
-			return snprintf(str, size, "table %u", sid->context.table);
-
-		case SEG6_LOCAL_ACTION_END_DX2:
-		case SEG6_LOCAL_ACTION_END_B6:
-		case SEG6_LOCAL_ACTION_END_B6_ENCAP:
-		case SEG6_LOCAL_ACTION_END_BM:
-		case SEG6_LOCAL_ACTION_END_S:
-		case SEG6_LOCAL_ACTION_END_AS:
-		case SEG6_LOCAL_ACTION_END_AM:
-		case SEG6_LOCAL_ACTION_UNSPEC:
-		default:
-			return snprintf(str, size, "unknown(%s)", __func__);
+	static struct srv6 srv6;
+	static bool first_execution = true;
+	if (first_execution) {
+		srv6.is_enable = false;
+		first_execution = false;
 	}
+	return &srv6;
 }
 
 void zebra_srv6_init()
