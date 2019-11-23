@@ -1207,7 +1207,8 @@ static void _netlink_route_build_singlepath(const char *routedesc, int bytelen,
 		uint32_t action = nexthop->seg6local_action;
 		const struct seg6local_context *ctx = &nexthop->seg6local_ctx;
 
-		if (action != SEG6_LOCAL_ACTION_END_DX4) {
+		if (action != SEG6_LOCAL_ACTION_END
+		 && action != SEG6_LOCAL_ACTION_END_DX4) {
 			zlog_err("%s: unsupport End behaviour action=%u", __func__, action);
 			return;
 		}
@@ -1217,6 +1218,9 @@ static void _netlink_route_build_singlepath(const char *routedesc, int bytelen,
 		addattr_l(nlmsg, req_size, RTA_ENCAP_TYPE, &encap, sizeof(uint16_t));
 		nest = addattr_nest(nlmsg, req_size, RTA_ENCAP);
 		switch (nexthop->seg6local_action) {
+			case SEG6_LOCAL_ACTION_END:
+				addattr32(nlmsg, req_size, SEG6_LOCAL_ACTION, SEG6_LOCAL_ACTION_END);
+				break;
 			case SEG6_LOCAL_ACTION_END_DX4:
 				addattr32(nlmsg, req_size, SEG6_LOCAL_ACTION, SEG6_LOCAL_ACTION_END_DX4);
 				addattr_l(nlmsg, req_size, SEG6_LOCAL_NH4, &ctx->nh4, sizeof(struct in_addr));
