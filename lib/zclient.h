@@ -608,10 +608,6 @@ extern void zclient_send_vrf_label(struct zclient *zclient, vrf_id_t vrf_id,
 				   afi_t afi, mpls_label_t label,
 				   enum lsp_types_t ltype);
 
-extern void zclient_send_vrf_seg6local_dx4(struct zclient *zclient,
-					 afi_t afi, struct in6_addr *sid, uint32_t vrf_table_id,
-					 bool install, uint32_t owner);
-
 extern void zclient_send_reg_requests(struct zclient *, vrf_id_t);
 extern void zclient_send_dereg_requests(struct zclient *, vrf_id_t);
 

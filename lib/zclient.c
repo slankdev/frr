@@ -404,35 +404,6 @@ void zclient_send_vrf_label(struct zclient *zclient, vrf_id_t vrf_id, afi_t afi,
 	zclient_send_message(zclient);
 }
 
-void zclient_send_vrf_seg6local_dx4(struct zclient *zclient,
-					 afi_t afi, struct in6_addr *sid, uint32_t vrf_table_id,
-					 bool install, uint32_t owner)
-{
-	vrf_id_t vrf_id = 0; /* global-vrf */
-	uint8_t nh4[4] = {169,254,99,(uint8_t)vrf_table_id};
-
-	struct zapi_seg6local api;
-	memset(&api, 0, sizeof(api));
-	memcpy(&api.sid, sid, sizeof(struct in6_addr));
-	memcpy(&api.nh4, nh4, 4);
-	api.action = SEG6_LOCAL_ACTION_END_DX4;
-	api.plen = 128;
-	api.owner = owner;
-
-	struct stream *s = zclient->obuf;
-	stream_reset(s);
-
-	zclient_create_header(s, install
-				? ZEBRA_SEG6LOCAL_ADD
-				: ZEBRA_SEG6LOCAL_DELETE,
-			vrf_id);
-
-	zapi_seg6local_encode(s, &api);
-
-	stream_putw_at(s, 0, stream_get_endp(s));
-	zclient_send_message(zclient);
-}
-
 /* Send register requests to zebra daemon for the information in a VRF. */
 void zclient_send_reg_requests(struct zclient *zclient, vrf_id_t vrf_id)
 {
