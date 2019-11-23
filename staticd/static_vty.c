@@ -38,8 +38,6 @@
 #include "staticd/static_vty_clippy.c"
 #endif
 
-#include "zebra/slankdev_netlink.h"
-
 #include <netinet/in.h>
 #include <linux/seg6_genl.h>
 #include <linux/seg6_hmac.h>

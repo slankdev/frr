@@ -133,7 +133,6 @@ noinst_HEADERS += \
 	zebra/rt.h \
 	zebra/rt_netlink.h \
 	zebra/ge_netlink.h \
-	zebra/slankdev_netlink.h \
 	zebra/rtadv.h \
 	zebra/rule_netlink.h \
 	zebra/zebra_mlag.h \
