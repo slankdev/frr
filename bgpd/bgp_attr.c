@@ -2935,9 +2935,6 @@ size_t bgp_packet_mpattr_start(struct stream *s, struct peer *peer, afi_t afi,
 				inet_pton(AF_INET6, "2001:aa::1", &nh6);
 				for (size_t i=0; i<16; i++)
 					stream_putc(s, nh6.s6_addr[i]);
-				/* stream_putl(s, 0); #<{(| RD = 0, per RFC |)}># */
-				/* stream_putl(s, 0); */
-				/* stream_put_ipv6(s, &nh6, 16); */
 			} else {
 				stream_putc(s, 12);
 				stream_putl(s, 0); /* RD = 0, per RFC */
