@@ -2932,7 +2932,7 @@ size_t bgp_packet_mpattr_start(struct stream *s, struct peer *peer, afi_t afi,
 			if (bgp_vpn->vpn_policy[AFI_IP].enable_srv6_vpn) {
 				stream_putc(s, 16);
 				struct in6_addr nh6;
-				inet_pton(AF_INET6, "2001:aa::1", &nh6);
+				inet_pton(AF_INET6, "2001:aa::1", &nh6); //TODO(slankdev):
 				for (size_t i=0; i<16; i++)
 					stream_putc(s, nh6.s6_addr[i]);
 			} else {
