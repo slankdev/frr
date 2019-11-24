@@ -50,20 +50,34 @@ DEFUN (show_segment_routing_ipv6_sid,
 	vty_out(vty, " Name       Context              Prefix                   Owner      \n");
 	vty_out(vty, "---------- -------------------- ------------------------ ------------\n");
 
-	// TODO(slankdev): Implement
-	/* for (size_t i=0; i<num_seg6local_sids(); i++) { */
-	/* 	const struct seg6local_sid *sid = seg6local_sids[i]; */
-	/* 	if (!sid) */
-	/* 		continue; */
-	/* 	const char *ostr; */
-	/* 	char str[128], pstr[128], cstr[128]; */
-	/* 	inet_ntop(AF_INET6, &sid->sid, str, sizeof(str)); */
-	/* 	snprintf(pstr, 128, "%s/%u", str, sid->plen); */
-	/* 	snprintf_seg6local_context(cstr, 128, sid); */
-	/* 	ostr = zebra_route_string(sid->owner); */
-	/* 	vty_out(vty, " %-10s %-20s %-24s %-12s\n", */
-	/* 			seg6local_action2str(sid->action), cstr, pstr, ostr); */
-	/* } */
+	struct route_table *table;
+	table = zebra_vrf_table(AFI_IP6, SAFI_UNICAST, VRF_DEFAULT);
+
+	for (struct route_node *rn = route_top(table);
+			 rn; rn = srcdest_route_next(rn)) {
+
+		struct route_entry *re;
+		RNODE_FOREACH_RE (rn, re) {
+			struct nexthop_group *nhg = &re->ng;
+			struct nexthop *nexthop;
+			for (ALL_NEXTHOPS_PTR(nhg, nexthop)) {
+				if (nexthop->seg6local_action == 0)
+					continue;
+
+				char cstr[128], pstr[128];
+				seg6local_context2str(cstr, 128,
+						&nexthop->seg6local_ctx,
+						nexthop->seg6local_action);
+				srcdest_rnode2str(rn, pstr, 128);
+
+				uint32_t action = nexthop->seg6local_action;
+				vty_out(vty, " %-10s %-20s %-24s %-12s\n",
+						seg6local_action2str(action), cstr, pstr,
+						zebra_route_string(re->type));
+
+			}
+		}
+	}
 
 	vty_out(vty, "\n");
 	return CMD_SUCCESS;
