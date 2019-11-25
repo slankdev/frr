@@ -146,31 +146,33 @@ nl_talk(int fd, struct nlmsghdr *n,
   return 0;
 }
 
-static int ge_netlink_resolve_family(int fd, const char* family_name)
+extern int ge_netlink_resolve_family(int fd, const char* family_name)
 {
-
- GENL_REQUEST(req, 1024, GENL_ID_CTRL, 0,
+  GENL_REQUEST(req, 1024, GENL_ID_CTRL, 0,
       2, CTRL_CMD_GETFAMILY, NLM_F_REQUEST);
   addattrstrz(&req.n, 1024, CTRL_ATTR_FAMILY_NAME, family_name);
 
   char buf[10000];
   struct nlmsghdr *answer = (struct nlmsghdr*)buf;
-  if (nl_talk(fd, &req.n, answer, sizeof(buf)) < 0)
-    exit(1);
 
-  int genl_family = -1;
-  memcpy(&req, answer, sizeof(req));
-  int len = req.n.nlmsg_len;
-  if (NLMSG_OK(&req.n, len) ) {
-    struct rtattr *rta[CTRL_ATTR_MAX + 1] = {};
-    int l = req.n.nlmsg_len - NLMSG_LENGTH(sizeof(struct genlmsghdr));
-    parse_rtattr(rta, CTRL_ATTR_MAX, (struct rtattr*)req.buf, l);
+	int genl_family = -1;
+	frr_with_privs(&zserv_privs) {
+		if (nl_talk(fd, &req.n, answer, sizeof(buf)) < 0)
+			exit(1);
+	}
 
-    if(rta[CTRL_ATTR_FAMILY_ID]) {
-      uint16_t id = rta_getattr_u16(rta[CTRL_ATTR_FAMILY_ID]);
-      genl_family = id;
-    }
-  }
+	memcpy(&req, answer, sizeof(req));
+	int len = req.n.nlmsg_len;
+	if (NLMSG_OK(&req.n, len) ) {
+		struct rtattr *rta[CTRL_ATTR_MAX + 1] = {};
+		int l = req.n.nlmsg_len - NLMSG_LENGTH(sizeof(struct genlmsghdr));
+		parse_rtattr(rta, CTRL_ATTR_MAX, (struct rtattr*)req.buf, l);
+
+		if(rta[CTRL_ATTR_FAMILY_ID]) {
+			uint16_t id = rta_getattr_u16(rta[CTRL_ATTR_FAMILY_ID]);
+			genl_family = id;
+		}
+	}
 	return genl_family;
 }
 
@@ -179,15 +181,16 @@ void ge_netlink_sr_tunsrc_change(struct in6_addr *src, struct zebra_ns *zns)
 	int fd = zns->genetlink.sock;
 	assert(fd >= 0);
 
-	frr_with_privs(&zserv_privs) {
-		int genl_family = ge_netlink_resolve_family(fd, "SEG6");
-		if (genl_family < 0) {
-			fprintf(stderr, "ge_netlink_get_family; error\n");
-			exit(1);
-		}
+	int genl_family = zns->genl_family_seg6;
+	if (genl_family < 0) {
+		zlog_err("Failure to resolv SEG6 genl family");
+		return;
+	}
 
-		GENL_REQUEST(req, 1024, genl_family, 0, SEG6_GENL_VERSION, SEG6_CMD_SET_TUNSRC, NLM_F_REQUEST);
-		addattr_l(&req.n, sizeof(req), SEG6_ATTR_DST, src, sizeof(struct in6_addr));
+	GENL_REQUEST(req, 1024, genl_family, 0, SEG6_GENL_VERSION, SEG6_CMD_SET_TUNSRC, NLM_F_REQUEST);
+	addattr_l(&req.n, sizeof(req), SEG6_ATTR_DST, src, sizeof(struct in6_addr));
+
+	frr_with_privs(&zserv_privs) {
 		if (nl_talk(fd, &req.n, NULL, 0) < 0)
 		 exit(1);
 	}

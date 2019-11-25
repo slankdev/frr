@@ -56,6 +56,7 @@ struct zebra_ns {
 	struct thread *t_netlink;
 
 	struct nlsock genetlink;      /* genl for SEG6 */
+	int genl_family_seg6;
 #endif
 
 	struct route_table *if_table;

@@ -55,6 +55,7 @@ struct {								\
 extern void ge_netlink_init(void);
 extern void ge_netlink_sr_tunsrc_read(void);
 extern void ge_netlink_sr_tunsrc_change(struct in6_addr *src, struct zebra_ns *zns);
+extern int ge_netlink_resolve_family(int fd, const char* family_name);
 
 #ifdef __cplusplus
 }

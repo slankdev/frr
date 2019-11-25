@@ -1158,6 +1158,10 @@ void kernel_init(struct zebra_ns *zns)
 		exit(-1);
 	}
 
+	zns->genl_family_seg6 = ge_netlink_resolve_family(zns->genetlink.sock, "SEG6");
+	if (zns->genl_family_seg6)
+		zlog_err("Failure to resolv SEG6 genl family");
+
 	/*
 	 * SOL_NETLINK is not available on all platforms yet
 	 * apparently.  It's in bits/socket.h which I am not
