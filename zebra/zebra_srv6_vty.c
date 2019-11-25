@@ -162,7 +162,13 @@ DEFUN (encapsulation_source_address,
 	}
 	assert(cp.prefixlen == 128);
 
-	ge_netlink_sr_tunsrc_change(&cp.prefix);
+	struct zebra_ns *zns = zebra_ns_lookup(0);
+	if (!zns) {
+		vty_out(vty, "can't find zebra_ns\n");
+		return CMD_WARNING_CONFIG_FAILED;
+	}
+
+	ge_netlink_sr_tunsrc_change(&cp.prefix, zns);
 
 	struct srv6 *srv6 = srv6_get_default();
 	srv6->is_enable = true;

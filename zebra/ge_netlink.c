@@ -174,26 +174,26 @@ static int ge_netlink_resolve_family(int fd, const char* family_name)
 	return genl_family;
 }
 
-void ge_netlink_sr_tunsrc_change(struct in6_addr *src)
+void ge_netlink_sr_tunsrc_change(struct in6_addr *src, struct zebra_ns *zns)
 {
-	int fd = -1;
-	frr_with_privs(&zserv_privs) {
-		fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_GENERIC);
-		if (fd < 0) {
-			fprintf(stderr, "open_genetlink_socket; error\n");
-			exit(1);
-		}
+	int fd = zns->genetlink.sock;
+	assert(fd >= 0);
 
+	frr_with_privs(&zserv_privs) {
 		int genl_family = ge_netlink_resolve_family(fd, "SEG6");
 		if (genl_family < 0) {
 			fprintf(stderr, "ge_netlink_get_family; error\n");
 			exit(1);
 		}
+
 		GENL_REQUEST(req, 1024, genl_family, 0, SEG6_GENL_VERSION, SEG6_CMD_SET_TUNSRC, NLM_F_REQUEST);
 		addattr_l(&req.n, sizeof(req), SEG6_ATTR_DST, src, sizeof(struct in6_addr));
 		if (nl_talk(fd, &req.n, NULL, 0) < 0)
 		 exit(1);
 	}
-	close(fd);
+}
+
+void ge_netlink_init(void)
+{
 }
 

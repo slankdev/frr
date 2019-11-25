@@ -21,8 +21,14 @@
 #define _ZEBRA_GE_NETLINK_H
 
 #include <netinet/in.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdbool.h>
 #include <linux/seg6_genl.h>
 #include <linux/genetlink.h>
+
+#include <zebra/zebra_ns.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -48,7 +54,7 @@ struct {								\
 
 extern void ge_netlink_init(void);
 extern void ge_netlink_sr_tunsrc_read(void);
-extern void ge_netlink_sr_tunsrc_change(struct in6_addr *src);
+extern void ge_netlink_sr_tunsrc_change(struct in6_addr *src, struct zebra_ns *zns);
 
 #ifdef __cplusplus
 }
