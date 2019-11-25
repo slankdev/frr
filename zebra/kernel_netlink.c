@@ -1159,7 +1159,7 @@ void kernel_init(struct zebra_ns *zns)
 	}
 
 	zns->genl_family_seg6 = ge_netlink_resolve_family(zns->genetlink.sock, "SEG6");
-	if (zns->genl_family_seg6)
+	if (zns->genl_family_seg6 < 0)
 		zlog_err("Failure to resolv SEG6 genl family");
 
 	/*
