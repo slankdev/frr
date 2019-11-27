@@ -34,27 +34,8 @@
 extern "C" {
 #endif
 
-#define GENL_REQUEST(_req, _bufsiz, _family, _hdrsiz, _ver, _cmd, _flags) \
-struct {								\
-	struct nlmsghdr		n;					\
-	struct genlmsghdr	g;					\
-	char			buf[NLMSG_ALIGN(_hdrsiz) + (_bufsiz)];	\
-} _req = {								\
-	.n = {								\
-		.nlmsg_type = (_family),				\
-		.nlmsg_flags = (_flags),				\
-		.nlmsg_len = NLMSG_LENGTH(GENL_HDRLEN + (_hdrsiz)),	\
-	},								\
-	.g = {								\
-		.cmd = (_cmd),						\
-		.version = (_ver),					\
-	},								\
-}
-
-
 extern void ge_netlink_init(void);
 extern void ge_netlink_sr_tunsrc_read(void);
-extern void ge_netlink_sr_tunsrc_change(struct in6_addr *src, struct zebra_ns *zns);
 extern int ge_netlink_resolve_family(int fd, const char* family_name);
 
 #ifdef __cplusplus

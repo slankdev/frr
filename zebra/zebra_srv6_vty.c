@@ -36,6 +36,7 @@
 #include "zebra/zebra_rnh.h"
 #include "zebra/redistribute.h"
 #include "zebra/zebra_routemap.h"
+#include "zebra/zebra_dplane.h"
 #include "zebra/ge_netlink.h"
 
 
@@ -168,7 +169,7 @@ DEFUN (encapsulation_source_address,
 		return CMD_WARNING_CONFIG_FAILED;
 	}
 
-	ge_netlink_sr_tunsrc_change(&cp.prefix, zns);
+	dplane_srtunsrc_update(&cp.prefix);
 
 	struct srv6 *srv6 = srv6_get_default();
 	srv6->is_enable = true;

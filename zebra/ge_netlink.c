@@ -26,10 +26,6 @@
 #include "zebra/zebra_mpls.h"
 #include "zebra/kernel_netlink.h"
 
-#define RTA_TAIL(rta) \
-    ((struct rtattr *) (((uint8_t *) (rta)) + \
-            RTA_ALIGN((rta)->rta_len)))
-
 extern struct zebra_privs_t zserv_privs;
 
 static inline int
@@ -43,16 +39,18 @@ nl_talk(int fd, struct nlmsghdr *n,
     answer_buf_siz = sizeof(buf);
   }
 
-  int ret = send(fd, n, n->nlmsg_len, 0);
-  if (ret < 0) {
-    perror("send");
-    exit(1);
-  }
-  ret = recv(fd, answer, answer_buf_siz, 0);
-  if (ret < 0) {
-    perror("recv");
-    exit(1);
-  }
+	frr_with_privs(&zserv_privs) {
+		int ret = send(fd, n, n->nlmsg_len, 0);
+		if (ret < 0) {
+			perror("send");
+			exit(1);
+		}
+		ret = recv(fd, answer, answer_buf_siz, 0);
+		if (ret < 0) {
+			perror("recv");
+			exit(1);
+		}
+	}
   return 0;
 }
 
@@ -97,15 +95,17 @@ extern int ge_netlink_resolve_family(int fd, const char* family_name)
 	return genl_family;
 }
 
-void ge_netlink_sr_tunsrc_change(struct in6_addr *src, struct zebra_ns *zns)
+/*
+ * Update or delete a srtunsrc from the kernel,
+ * using info from a dataplane context.
+ */
+enum zebra_dplane_result kernel_srtunsrc_update_ctx(struct zebra_dplane_ctx *ctx)
 {
-	int fd = zns->genetlink.sock;
-	assert(fd >= 0);
-
+	const struct zebra_ns *zns = zebra_ns_lookup(0);
 	int genl_family = zns->genl_family_seg6;
 	if (genl_family < 0) {
 		zlog_err("Failure to resolv SEG6 genl family");
-		return;
+		return ZEBRA_DPLANE_REQUEST_FAILURE;
 	}
 
 	struct {
@@ -121,12 +121,22 @@ void ge_netlink_sr_tunsrc_change(struct in6_addr *src, struct zebra_ns *zns)
 	req.g.cmd = SEG6_CMD_SET_TUNSRC;
 	req.g.version = SEG6_GENL_VERSION;
 
-	addattr_l(&req.n, sizeof(req), SEG6_ATTR_DST, src, sizeof(struct in6_addr));
+	addattr_l(&req.n, sizeof(req), SEG6_ATTR_DST,
+			dplane_ctx_srtunsrc_get_addr(ctx),
+			sizeof(struct in6_addr));
 
-	frr_with_privs(&zserv_privs) {
-		if (nl_talk(fd, &req.n, NULL, 0) < 0)
-		 exit(1);
-	}
+	enum zebra_dplane_result result = ZEBRA_DPLANE_REQUEST_SUCCESS;
+
+#if 0
+	result = netlink_talk_info(netlink_talk_filter, &req.n,
+			dplane_ctx_get_ns(ctx), 0);
+#else
+	int fd = zns->genetlink.sock;
+	if (nl_talk(fd, &req.n, NULL, 0) < 0)
+	 exit(1);
+#endif
+
+	return result;
 }
 
 void ge_netlink_init(void)

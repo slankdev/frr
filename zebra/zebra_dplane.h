@@ -138,6 +138,10 @@ enum dplane_op_e {
 	/* EVPN VTEP updates */
 	DPLANE_OP_VTEP_ADD,
 	DPLANE_OP_VTEP_DELETE,
+
+	/* SR tunsrc updates */
+	DPLANE_OP_SRTUNSRC_UPDATE,
+	DPLANE_OP_SRTUNSRC_DELETE,
 };
 
 /*
@@ -338,6 +342,10 @@ const struct ethaddr *dplane_ctx_neigh_get_mac(
 uint32_t dplane_ctx_neigh_get_flags(const struct zebra_dplane_ctx *ctx);
 uint16_t dplane_ctx_neigh_get_state(const struct zebra_dplane_ctx *ctx);
 
+/* Accessors for srtunsrc information */
+const struct in6_addr *dplane_ctx_srtunsrc_get_addr(
+	const struct zebra_dplane_ctx *ctx);
+
 /* Namespace info - esp. for netlink communication */
 const struct zebra_dplane_info *dplane_ctx_get_ns(
 	const struct zebra_dplane_ctx *ctx);
@@ -437,6 +445,12 @@ enum zebra_dplane_result dplane_vtep_add(const struct interface *ifp,
 enum zebra_dplane_result dplane_vtep_delete(const struct interface *ifp,
 					    const struct in_addr *ip,
 					    vni_t vni);
+
+/*
+ * Enqueue srtunsrc updates for the dataplane.
+ */
+enum zebra_dplane_result dplane_srtunsrc_update(const struct in6_addr *addr);
+enum zebra_dplane_result dplane_srtunsrc_delete(void);
 
 
 /* Retrieve the limit on the number of pending, unprocessed updates. */
