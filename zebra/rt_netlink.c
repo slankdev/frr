@@ -1222,7 +1222,13 @@ get_pseudo_dt4_vrf_ip(uint32_t table_id)
 		inet_ntop(p->family, p->u.val, buf, BUFSIZ);
 
 		in_addr_t val = p->u.prefix4.s_addr;
-		in_addr_t beg = ipv4_network_addr(val, p->prefixlen);
+
+		struct prefix_ipv4 *prefix_beg = prefix_ipv4_new();
+		prefix_beg->prefixlen = p->prefixlen;
+		prefix_beg->prefix.s_addr = val;
+		apply_mask_ipv4(prefix_beg);
+
+		in_addr_t beg = prefix_beg->prefix.s_addr;
 		in_addr_t end = ipv4_broadcast_addr(val, p->prefixlen);
 		for (in_addr_t i = beg;
 		     ntohl(i) <= ntohl(end);
