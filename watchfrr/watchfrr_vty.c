@@ -151,6 +151,18 @@ DEFPY (watchfrr_ignore_daemon,
 	return CMD_SUCCESS;
 }
 
+DEFPY (watchfrr_ignore_timeout,
+       watchfrr_ignore_timeout_cmd,
+       "watchfrr ignore timeout <0-180>",
+       "Watchfrr Specific sub-command\n"
+       "Ignore a specified daemon when it does not respond to echo request\n"
+       "Ignore a specified daemon when it does not respond to echo request\n"
+       "Specifty timeout-val\n")
+{
+	vty_out(vty, "%s\n", __func__);
+	return CMD_SUCCESS;
+}
+
 void integrated_write_sigchld(int status)
 {
 	uint8_t reply[4] = {0, 0, 0, CMD_WARNING};
@@ -189,5 +201,6 @@ void watchfrr_vty_init(void)
 	install_element(ENABLE_NODE, &watchfrr_ignore_daemon_cmd);
 
 	install_element(CONFIG_NODE, &show_debugging_watchfrr_cmd);
+	install_element(CONFIG_NODE, &watchfrr_ignore_timeout_cmd);
 	install_element(VIEW_NODE, &show_watchfrr_cmd);
 }
