@@ -75,6 +75,8 @@ extern void vpn_leak_to_vrf_update(struct bgp *bgp_vpn,
 extern void vpn_leak_to_vrf_withdraw(struct bgp *bgp_vpn,
 				     struct bgp_path_info *path_vpn);
 
+extern void vpn_leak_zebra_vrf_sid_update(struct bgp *bgp, afi_t afi);
+extern void vpn_leak_zebra_vrf_sid_withdraw(struct bgp *bgp, afi_t afi);
 extern void vpn_leak_zebra_vrf_label_update(struct bgp *bgp, afi_t afi);
 extern void vpn_leak_zebra_vrf_label_withdraw(struct bgp *bgp, afi_t afi);
 extern int vpn_leak_label_callback(mpls_label_t label, void *lblid, bool alloc);
@@ -82,6 +84,8 @@ extern void vrf_import_from_vrf(struct bgp *to_bgp, struct bgp *from_bgp,
 				afi_t afi, safi_t safi);
 void vrf_unimport_from_vrf(struct bgp *to_bgp, struct bgp *from_bgp,
 			   afi_t afi, safi_t safi);
+
+const char * srv6_vpn_version2str(enum srv6_vpn_version v);
 
 static inline int vpn_leak_to_vpn_active(struct bgp *bgp_vrf, afi_t afi,
 					 const char **pmsg)
@@ -127,14 +131,31 @@ static inline int vpn_leak_to_vpn_active(struct bgp *bgp_vrf, afi_t afi,
 		return 0;
 	}
 
-	/* Is there an "auto" export label that isn't allocated yet? */
-	if (CHECK_FLAG(bgp_vrf->vpn_policy[afi].flags,
-		BGP_VPN_POLICY_TOVPN_LABEL_AUTO) &&
-		(bgp_vrf->vpn_policy[afi].tovpn_label == MPLS_LABEL_NONE)) {
+	bool enable_srv6_vpn = bgp_get_default()->vpn_policy[afi].enable_srv6_vpn;
+	if (enable_srv6_vpn) {
 
-		if (pmsg)
-			*pmsg = "auto label not allocated";
-		return 0;
+		/* Is there an "auto" export sid that isn't allocated yet? */
+		bool sid_empty = sid_zero(&bgp_vrf->vpn_policy[afi].tovpn_sid);
+		bool sid_auto = CHECK_FLAG(bgp_vrf->vpn_policy[afi].flags,
+		                           BGP_VPN_POLICY_TOVPN_SID_AUTO);
+		if (sid_auto && sid_empty) {
+			if (pmsg)
+				*pmsg = "auto SID not allocated";
+			return 0;
+		}
+
+	} else {
+
+		/* Is there an "auto" export label that isn't allocated yet? */
+		if (CHECK_FLAG(bgp_vrf->vpn_policy[afi].flags,
+			BGP_VPN_POLICY_TOVPN_LABEL_AUTO) &&
+			(bgp_vrf->vpn_policy[afi].tovpn_label == MPLS_LABEL_NONE)) {
+
+			if (pmsg)
+				*pmsg = "auto label not allocated";
+			return 0;
+		}
+
 	}
 
 	return 1;
@@ -216,12 +237,22 @@ static inline void vpn_leak_postchange(vpn_policy_direction_t direction,
 		vpn_leak_to_vrf_update_all(bgp_vrf, bgp_vpn, afi);
 	if (direction == BGP_VPN_POLICY_DIR_TOVPN) {
 
-		if (bgp_vrf->vpn_policy[afi].tovpn_label !=
-			bgp_vrf->vpn_policy[afi]
-			       .tovpn_zebra_vrf_label_last_sent) {
-			vpn_leak_zebra_vrf_label_update(bgp_vrf, afi);
-		}
+		if (bgp_vpn->vpn_policy[afi].enable_srv6_vpn) {
 
+			struct in6_addr *tovpn_sid = &bgp_vrf->vpn_policy[afi].tovpn_sid;
+			struct in6_addr *tovpn_sid_last = &bgp_vrf->vpn_policy[afi]
+				.tovpn_zebra_vrf_sid_last_sent;
+			if (sid_diff(tovpn_sid, tovpn_sid_last))
+				vpn_leak_zebra_vrf_sid_update(bgp_vrf, afi);
+
+		} else {
+
+			if (bgp_vrf->vpn_policy[afi].tovpn_label !=
+				bgp_vrf->vpn_policy[afi]
+							 .tovpn_zebra_vrf_label_last_sent)
+				vpn_leak_zebra_vrf_label_update(bgp_vrf, afi);
+
+		}
 		vpn_leak_from_vrf_update_all(bgp_vpn, bgp_vrf, afi);
 	}
 }

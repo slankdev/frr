@@ -24,6 +24,7 @@
 #include "lib/json.h"
 #include "lib_errors.h"
 #include "lib/zclient.h"
+#include "lib/srv6.h"
 #include "prefix.h"
 #include "plist.h"
 #include "buffer.h"
@@ -6675,6 +6676,94 @@ ALIAS (af_rd_vpn_export,
        "Between current address-family and vpn\n"
        "For routes leaked from current address-family to vpn\n")
 
+DEFUN (show_bgp_srv6_service_version,
+       show_bgp_srv6_service_version_cmd,
+       "show bgp srv6-service-version",
+       SHOW_STR
+       BGP_STR
+       "SRv6-Service version\n")
+{
+	struct bgp *bgp = bgp_get_default();
+	if (!bgp) {
+		vty_out(vty, "can't find bgp instance.\n");
+		return CMD_WARNING_CONFIG_FAILED;
+	}
+
+	struct vpn_policy *pol = &bgp->vpn_policy[AFI_IP];
+	if (!pol->enable_srv6_vpn) {
+		vty_out(vty, "srv6-vpn isn't enabled.\n");
+		return CMD_WARNING_CONFIG_FAILED;
+	}
+
+	vty_out(vty, "current-version: %s\n",
+			srv6_vpn_version2str(pol->srv6_vpn_version));
+	vty_out(vty, "available-versions: \n");
+	for (int i=0; i<MAX_BGP_VPN_SRV6; i++)
+		vty_out(vty, " - %s\n", srv6_vpn_version2str(i));
+	return CMD_SUCCESS;
+}
+
+DEFUN (segment_routing_ipv6,
+       segment_routing_ipv6_cmd,
+       "[no] segment-routing-ipv6 [service-pre-04|service-pre-05]",
+       NO_STR
+       "Enable or Disable Segment-Routing-IPv6\n"
+       "draft version draft-dawra-idr-srv6-vpn-04\n"
+       "draft version draft-dawra-idr-srv6-vpn-05 (default)\n")
+{
+	int idx = 0;
+	bool yes = true;
+	if (argv_find(argv, argc, "no", &idx))
+		yes = false;
+
+	enum srv6_vpn_version version = BGP_VPN_SRV6_DAWRA_05;
+	if (argv_find(argv, argc, "service-pre-05", &idx))
+		version = BGP_VPN_SRV6_DAWRA_05;
+	else if (argv_find(argv, argc, "service-pre-04", &idx))
+		version = BGP_VPN_SRV6_DAWRA_04;
+
+	struct bgp *bgp = bgp_get_default();
+	bgp->vpn_policy[AFI_IP].enable_srv6_vpn = yes;
+	bgp->vpn_policy[AFI_IP].srv6_vpn_version = version;
+	return CMD_SUCCESS;
+}
+
+DEFUN (af_sid_vpn_export_locator,
+       af_sid_vpn_export_locator_cmd,
+       "[no] sid vpn export locator default",
+       NO_STR
+       "SRv6-SID value for VRF\n"
+       "Between current address-family and vpn\n"
+       "For routes leaked from current address-family to vpn\n"
+			 "Specify locator\n"
+			 "Specify default locator\n")
+{
+	int idx = 0;
+	bool yes = true;
+	if (argv_find(argv, argc, "no", &idx))
+		yes = false;
+
+	if (!yes) {
+		zlog_err("%s: negate mode isn't implemented", __func__);
+		return CMD_WARNING_CONFIG_FAILED;
+	}
+
+	VTY_DECLVAR_CONTEXT(bgp, bgp);
+	afi_t afi = vpn_policy_getafi(vty, bgp, false);
+
+	vpn_leak_prechange(BGP_VPN_POLICY_DIR_TOVPN, afi, bgp_get_default(), bgp);
+
+	if (sid_zero(&bgp->vpn_policy[afi].tovpn_sid)) {
+		SET_FLAG(bgp->vpn_policy[afi].flags,
+			 BGP_VPN_POLICY_TOVPN_SID_AUTO);
+		bgp_srv6_sid_alloc();
+	}
+
+	vpn_leak_postchange(BGP_VPN_POLICY_DIR_TOVPN, afi, bgp_get_default(), bgp);
+
+	return CMD_SUCCESS;
+}
+
 DEFPY (af_label_vpn_export,
        af_label_vpn_export_cmd,
        "[no] label vpn export <(0-1048575)$label_val|auto$label_auto>",
@@ -7271,7 +7360,6 @@ DEFUN_NOSH (address_family_ipv4_safi,
 	"Address Family\n"
 	BGP_SAFI_WITH_LABEL_HELP_STR)
 {
-
 	if (argc == 3) {
 		VTY_DECLVAR_CONTEXT(bgp, bgp);
 		safi_t safi = bgp_vty_safi_from_str(argv[2]->text);
@@ -12991,6 +13079,11 @@ static void bgp_vpn_policy_config_write_afi(struct vty *vty, struct bgp *bgp,
 		return;
 
 	if (CHECK_FLAG(bgp->vpn_policy[afi].flags,
+		BGP_VPN_POLICY_TOVPN_SID_AUTO)) {
+		vty_out(vty, "%*ssid vpn export locator default\n", indent, "");
+	}
+
+	if (CHECK_FLAG(bgp->vpn_policy[afi].flags,
 		BGP_VPN_POLICY_TOVPN_LABEL_AUTO)) {
 
 		vty_out(vty, "%*slabel vpn export %s\n", indent, "", "auto");
@@ -13709,6 +13802,10 @@ static void bgp_config_write_family(struct vty *vty, struct bgp *bgp, afi_t afi,
 
 	bgp_config_write_maxpaths(vty, bgp, afi, safi);
 	bgp_config_write_table_map(vty, bgp, afi, safi);
+
+	if (afi == AFI_IP && safi == SAFI_MPLS_VPN)
+		if (bgp->vpn_policy[AFI_IP].enable_srv6_vpn)
+			vty_out(vty, "  segment-routing-ipv6\n");
 
 	if (safi == SAFI_EVPN)
 		bgp_config_write_evpn_info(vty, bgp, afi, safi);
@@ -15352,6 +15449,7 @@ void bgp_vty_init(void)
 	install_element(BGP_IPV6_NODE, &af_rd_vpn_export_cmd);
 	install_element(BGP_IPV4_NODE, &af_label_vpn_export_cmd);
 	install_element(BGP_IPV6_NODE, &af_label_vpn_export_cmd);
+	install_element(BGP_IPV4_NODE, &af_sid_vpn_export_locator_cmd);
 	install_element(BGP_IPV4_NODE, &af_nexthop_vpn_export_cmd);
 	install_element(BGP_IPV6_NODE, &af_nexthop_vpn_export_cmd);
 	install_element(BGP_IPV4_NODE, &af_rt_vpn_imexport_cmd);
@@ -15376,6 +15474,9 @@ void bgp_vty_init(void)
 	install_element(BGP_IPV6_NODE, &af_no_route_map_vpn_imexport_cmd);
 	install_element(BGP_IPV4_NODE, &af_no_import_vrf_route_map_cmd);
 	install_element(BGP_IPV6_NODE, &af_no_import_vrf_route_map_cmd);
+
+	install_element(BGP_VPNV4_NODE, &segment_routing_ipv6_cmd);
+	install_element(VIEW_NODE, &show_bgp_srv6_service_version_cmd);
 }
 
 #include "memory.h"
