@@ -53,6 +53,7 @@
 #include "zebra/zebra_rnh.h"
 #include "zebra/zebra_pbr.h"
 #include "zebra/zebra_vxlan.h"
+#include "zebra/zebra_srv6.h"
 
 #if defined(HANDLE_NETLINK_FUZZING)
 #include "zebra/kernel_netlink.h"
@@ -407,6 +408,9 @@ int main(int argc, char **argv)
 	zebra_mpls_vty_init();
 	zebra_pw_vty_init();
 	zebra_pbr_init();
+
+	zebra_srv6_init();
+	zebra_srv6_vty_init();
 
 /* For debug purpose. */
 /* SET_FLAG (zebra_debug_event, ZEBRA_DEBUG_EVENT); */

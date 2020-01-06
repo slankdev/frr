@@ -39,6 +39,7 @@
 #include "pbr.h"
 #include "nexthop_group.h"
 #include "lib_errors.h"
+#include "srv6.h"
 
 DEFINE_MTYPE_STATIC(LIB, ZCLIENT, "Zclient")
 DEFINE_MTYPE_STATIC(LIB, REDIST_INST, "Redistribution instance IDs")
@@ -937,6 +938,17 @@ int zapi_nexthop_encode(struct stream *s, const struct zapi_nexthop *api_nh,
 		stream_put(s, &(api_nh->rmac),
 			   sizeof(struct ethaddr));
 
+	if (CHECK_FLAG(api_flags, ZEBRA_FLAG_SEG6_ROUTE)) {
+		stream_putc(s, api_nh->sid_num);
+		for (uint8_t i=0; i<api_nh->sid_num; i++)
+			stream_write(s, &api_nh->sids[i], 16);
+	}
+
+	if (CHECK_FLAG(api_flags, ZEBRA_FLAG_SEG6LOCAL_ROUTE)) {
+		stream_putl(s, api_nh->seg6local_action);
+		stream_write(s, &api_nh->seg6local_ctx, sizeof(struct seg6local_context));
+	}
+
 done:
 	return ret;
 }
@@ -1101,6 +1113,17 @@ static int zapi_nexthop_decode(struct stream *s, struct zapi_nexthop *api_nh,
 	if (CHECK_FLAG(api_flags, ZEBRA_FLAG_EVPN_ROUTE))
 		STREAM_GET(&(api_nh->rmac), s,
 			   sizeof(struct ethaddr));
+
+	if (CHECK_FLAG(api_flags, ZEBRA_FLAG_SEG6_ROUTE)) {
+		STREAM_GETC(s, api_nh->sid_num);
+		for (uint8_t i=0; i<api_nh->sid_num; i++)
+			STREAM_GET(&api_nh->sids[i], s, 16);
+	}
+
+	if (CHECK_FLAG(api_flags, ZEBRA_FLAG_SEG6LOCAL_ROUTE)) {
+		STREAM_GETL(s, api_nh->seg6local_action);
+		STREAM_GET(&api_nh->seg6local_ctx, s, sizeof(struct seg6local_context));
+	}
 
 	/* Success */
 	ret = 0;
@@ -3178,6 +3201,9 @@ static int zclient_read(struct thread *thread)
 		break;
 	case ZEBRA_MLAG_FORWARD_MSG:
 		zclient_mlag_handle_msg(command, zclient, length, vrf_id);
+	case ZEBRA_SRV6_ALLOC_SID:
+		if (zclient->srv6_sid_alloc)
+			(*zclient->srv6_sid_alloc)(command, zclient, length, vrf_id);
 		break;
 	case ZEBRA_ERROR:
 		zclient_handle_error(command, zclient, length, vrf_id);
@@ -3296,4 +3322,14 @@ void zclient_interface_set_master(struct zclient *client,
 
 	stream_putw_at(s, 0, stream_get_endp(s));
 	zclient_send_message(client);
+}
+
+int zclient_srv6_alloc_sid(struct zclient *zclient)
+{
+	struct stream *s = zclient->obuf;
+	stream_reset(s);
+	zclient_create_header(s, ZEBRA_SRV6_ALLOC_SID, 0);
+	stream_putw_at(s, 0, stream_get_endp(s));
+	zclient_send_message(zclient);
+	return 0;
 }

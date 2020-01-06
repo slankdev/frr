@@ -12,6 +12,7 @@ vtysh_scan += \
 	$(top_srcdir)/zebra/rtadv.c \
 	$(top_srcdir)/zebra/zebra_mlag_vty.c \
 	$(top_srcdir)/zebra/zebra_mpls_vty.c \
+	$(top_srcdir)/zebra/zebra_srv6_vty.c \
 	$(top_srcdir)/zebra/zebra_ptm.c \
 	$(top_srcdir)/zebra/zebra_pw.c \
 	$(top_srcdir)/zebra/zebra_routemap.c \
@@ -64,6 +65,7 @@ zebra_zebra_SOURCES = \
 	zebra/redistribute.c \
 	zebra/router-id.c \
 	zebra/rt_netlink.c \
+	zebra/ge_netlink.c \
 	zebra/rt_socket.c \
 	zebra/rtadv.c \
 	zebra/rtread_getmsg.c \
@@ -81,6 +83,8 @@ zebra_zebra_SOURCES = \
 	zebra/zebra_mpls_openbsd.c \
 	zebra/zebra_mpls_null.c \
 	zebra/zebra_mpls_vty.c \
+	zebra/zebra_srv6.c \
+	zebra/zebra_srv6_vty.c \
 	zebra/zebra_mroute.c \
 	zebra/zebra_nhg.c \
 	zebra/zebra_ns.c \
@@ -134,6 +138,7 @@ noinst_HEADERS += \
 	zebra/router-id.h \
 	zebra/rt.h \
 	zebra/rt_netlink.h \
+	zebra/ge_netlink.h \
 	zebra/rtadv.h \
 	zebra/rule_netlink.h \
 	zebra/zebra_mlag.h \
@@ -143,6 +148,7 @@ noinst_HEADERS += \
 	zebra/zebra_dplane.h \
 	zebra/zebra_memory.h \
 	zebra/zebra_mpls.h \
+	zebra/zebra_srv6.h \
 	zebra/zebra_mroute.h \
 	zebra/zebra_nhg.h \
 	zebra/zebra_nhg_private.h \

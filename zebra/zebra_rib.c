@@ -2471,6 +2471,10 @@ void _route_entry_dump(const char *func, union prefixconstptr pp,
 			   (CHECK_FLAG(nexthop->flags, NEXTHOP_FLAG_DUPLICATE)
 				    ? "DUPLICATE "
 				    : ""));
+		zlog_debug("%s: %s %s[%u] seg6local_action == %u",
+			   straddr, (nexthop->rparent ? "  NH" : "NH"),
+				 nhname, nexthop->ifindex,
+				 nexthop->seg6local_action);
 	}
 	zlog_debug("%s: dump complete", straddr);
 }
@@ -3471,6 +3475,8 @@ static int rib_process_dplane_results(struct thread *thread)
 			case DPLANE_OP_NEIGH_DELETE:
 			case DPLANE_OP_VTEP_ADD:
 			case DPLANE_OP_VTEP_DELETE:
+			case DPLANE_OP_SRTUNSRC_UPDATE:
+			case DPLANE_OP_SRTUNSRC_DELETE:
 			case DPLANE_OP_NONE:
 				/* Don't expect this: just return the struct? */
 				dplane_ctx_fini(&ctx);

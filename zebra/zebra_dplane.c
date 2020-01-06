@@ -187,6 +187,13 @@ struct dplane_neigh_info {
 };
 
 /*
+ * SR tunsrc info for the dataplane
+ */
+struct dplane_srtunsrc_info {
+	struct in6_addr addr;
+};
+
+/*
  * The context block used to exchange info about route updates across
  * the boundary between the zebra main context (and pthread) and the
  * dataplane layer (and pthread).
@@ -233,6 +240,7 @@ struct zebra_dplane_ctx {
 		struct dplane_intf_info intf;
 		struct dplane_mac_info macinfo;
 		struct dplane_neigh_info neigh;
+		struct dplane_srtunsrc_info srtunsrc;
 	} u;
 
 	/* Namespace info, used especially for netlink kernel communication */
@@ -355,6 +363,9 @@ static struct zebra_dplane_globals {
 
 	_Atomic uint32_t dg_neighs_in;
 	_Atomic uint32_t dg_neigh_errors;
+
+	_Atomic uint32_t dg_srtunsrc_in;
+	_Atomic uint32_t dg_srtunsrc_errors;
 
 	_Atomic uint32_t dg_update_yields;
 
@@ -544,6 +555,8 @@ static void dplane_ctx_free(struct zebra_dplane_ctx **pctx)
 	case DPLANE_OP_NEIGH_DELETE:
 	case DPLANE_OP_VTEP_ADD:
 	case DPLANE_OP_VTEP_DELETE:
+	case DPLANE_OP_SRTUNSRC_UPDATE:
+	case DPLANE_OP_SRTUNSRC_DELETE:
 	case DPLANE_OP_NONE:
 		break;
 	}
@@ -736,6 +749,13 @@ const char *dplane_op2str(enum dplane_op_e op)
 		break;
 	case DPLANE_OP_VTEP_DELETE:
 		ret = "VTEP_DELETE";
+		break;
+
+	case DPLANE_OP_SRTUNSRC_UPDATE:
+		ret = "SRTUNSRC_UPDATE";
+		break;
+	case DPLANE_OP_SRTUNSRC_DELETE:
+		ret = "SRTUNSRC_DELETE";
 		break;
 	}
 
@@ -1399,6 +1419,14 @@ uint16_t dplane_ctx_neigh_get_state(const struct zebra_dplane_ctx *ctx)
 {
 	DPLANE_CTX_VALID(ctx);
 	return ctx->u.neigh.state;
+}
+
+/* Accessors for srtunsrc information */
+const struct in6_addr *dplane_ctx_srtunsrc_get_addr(
+	const struct zebra_dplane_ctx *ctx)
+{
+	DPLANE_CTX_VALID(ctx);
+	return &(ctx->u.srtunsrc.addr);
 }
 
 /*
@@ -2661,6 +2689,62 @@ neigh_update_internal(enum dplane_op_e op,
 	return result;
 }
 
+static enum zebra_dplane_result
+srtunsrc_update_internal(enum dplane_op_e op,
+		const struct in6_addr *addr)
+{
+	enum zebra_dplane_result result = ZEBRA_DPLANE_REQUEST_FAILURE;
+
+	if (IS_ZEBRA_DEBUG_DPLANE_DETAIL) {
+		char buf1[ETHER_ADDR_STRLEN];
+		inet_ntop(AF_INET6, addr, buf1, sizeof(buf1));
+		zlog_debug("init sr ctx %s: addr %s",
+			   dplane_op2str(op), buf1);
+	}
+
+	struct zebra_dplane_ctx *ctx = NULL;
+	ctx = dplane_ctx_alloc();
+	ctx->zd_op = op;
+	ctx->zd_status = ZEBRA_DPLANE_REQUEST_SUCCESS;
+	ctx->zd_vrf_id = 0;
+	memcpy(&ctx->u.srtunsrc.addr, addr, 16);
+
+	struct zebra_ns *zns;
+	zns = zebra_ns_lookup(0);
+	dplane_ctx_ns_init(ctx, zns, false);
+
+	/* Enqueue for processing on the dplane pthread */
+	int ret = dplane_update_enqueue(ctx);
+
+	/* Increment counter */
+	atomic_fetch_add_explicit(&zdplane_info.dg_srtunsrc_in, 1,
+				  memory_order_relaxed);
+
+	if (ret == AOK)
+		result = ZEBRA_DPLANE_REQUEST_QUEUED;
+	else {
+		/* Error counter */
+		atomic_fetch_add_explicit(&zdplane_info.dg_srtunsrc_errors, 1,
+					  memory_order_relaxed);
+		dplane_ctx_free(&ctx);
+	}
+
+	return result;
+}
+
+enum zebra_dplane_result dplane_srtunsrc_update(
+		const struct in6_addr *addr)
+{
+	return srtunsrc_update_internal(DPLANE_OP_SRTUNSRC_UPDATE, addr);
+}
+
+enum zebra_dplane_result dplane_srtunsrc_delete(void)
+{
+	uint8_t zero[16] = {0};
+	return srtunsrc_update_internal(DPLANE_OP_SRTUNSRC_DELETE,
+			(const struct in6_addr*)zero);
+}
+
 /*
  * Handler for 'show dplane'
  */
@@ -3220,6 +3304,33 @@ kernel_dplane_neigh_update(struct zebra_dplane_ctx *ctx)
 }
 
 /*
+ * Handler for kernel-facing SR tunsrc updates
+ */
+static enum zebra_dplane_result
+kernel_dplane_srtunsrc_update(struct zebra_dplane_ctx *ctx)
+{
+	enum zebra_dplane_result res;
+
+	if (IS_ZEBRA_DEBUG_DPLANE_DETAIL) {
+		char buf[PREFIX_STRLEN];
+
+		inet_ntop(AF_INET6, dplane_ctx_srtunsrc_get_addr(ctx),
+				buf, sizeof(buf));
+
+		zlog_debug("Dplane %s, addr %s",
+			   dplane_op2str(dplane_ctx_get_op(ctx)), buf);
+	}
+
+	res = kernel_srtunsrc_update_ctx(ctx);
+
+	if (res != ZEBRA_DPLANE_REQUEST_SUCCESS)
+		atomic_fetch_add_explicit(&zdplane_info.dg_srtunsrc_errors,
+					  1, memory_order_relaxed);
+
+	return res;
+}
+
+/*
  * Kernel provider callback
  */
 static int kernel_dplane_process_func(struct zebra_dplane_provider *prov)
@@ -3290,6 +3401,11 @@ static int kernel_dplane_process_func(struct zebra_dplane_provider *prov)
 		case DPLANE_OP_VTEP_ADD:
 		case DPLANE_OP_VTEP_DELETE:
 			res = kernel_dplane_neigh_update(ctx);
+			break;
+
+		case DPLANE_OP_SRTUNSRC_UPDATE:
+		case DPLANE_OP_SRTUNSRC_DELETE:
+			res = kernel_dplane_srtunsrc_update(ctx);
 			break;
 
 		/* Ignore 'notifications' - no-op */
