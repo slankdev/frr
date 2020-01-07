@@ -22,6 +22,7 @@
 #define _QUAGGA_BGP_ZEBRA_H
 
 #include "vxlan.h"
+#include "srv6.h"
 
 extern void bgp_zebra_init(struct thread_master *master,
 			   unsigned short instance);
@@ -29,6 +30,7 @@ extern void bgp_zebra_init_tm_connect(struct bgp *bgp);
 extern uint32_t bgp_zebra_tm_get_id(void);
 extern bool bgp_zebra_tm_chunk_obtained(void);
 extern void bgp_zebra_destroy(void);
+
 extern int bgp_zebra_get_table_range(uint32_t chunk_size,
 				     uint32_t *start, uint32_t *end);
 extern int bgp_if_update_all(void);
@@ -101,4 +103,13 @@ extern void bgp_zebra_announce_default(struct bgp *bgp, struct nexthop *nh,
 extern int bgp_zebra_send_capabilities(struct bgp *bgp, bool disable);
 extern int bgp_zebra_update(afi_t afi, safi_t safi, vrf_id_t vrf_id, int type);
 extern int bgp_zebra_stale_timer_update(struct bgp *bgp);
+
+extern struct srv6_locator *bgp_srv6_locator_lookup(const char *name);
+extern int bgp_zebra_send_srv6_function_add(struct srv6_function *function);
+extern int bgp_zebra_send_srv6_function_set(bool install,
+						const struct prefix_ipv6 *sid, uint32_t action,
+						const struct seg6local_context *ctx,
+						const struct in6_addr *nh6, uint32_t ifindex,
+						uint32_t nexthop_type);
+
 #endif /* _QUAGGA_BGP_ZEBRA_H */
