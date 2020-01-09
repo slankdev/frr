@@ -178,3 +178,21 @@ void zebra_srv6_alloc_sid(ZAPI_HANDLER_ARGS)
 
 	zserv_send_message(client, s);
 }
+
+struct ipv6_sr_hdr *parse_srh(bool encap,
+    size_t num_segs, const struct in6_addr *segs)
+{
+  const size_t srhlen = 8 + sizeof(struct in6_addr)*(encap ? num_segs+1 : num_segs);
+
+  struct ipv6_sr_hdr *srh = malloc(srhlen);
+  memset(srh, 0, srhlen);
+  srh->hdrlen = (srhlen >> 3) - 1;
+  srh->type = 4;
+  srh->segments_left = encap ? num_segs : num_segs - 1;
+  srh->first_segment = encap ? num_segs : num_segs - 1;
+
+  size_t srh_idx = encap ? 1 : 0;
+  for (ssize_t i=num_segs-1; i>=0; i--)
+    memcpy(&srh->segments[srh_idx + i], &segs[num_segs - 1 - i], sizeof(struct in6_addr));
+  return srh;
+}
