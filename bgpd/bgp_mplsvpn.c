@@ -587,7 +587,7 @@ leak_update(struct bgp *bgp, /* destination bgp instance */
 	char buf_prefix[PREFIX_STRLEN];
 
 	uint32_t num_sids = 0;
-	if (!sid_zero(&new_attr->sid))
+	if (new_attr->srv6_l3vpn || new_attr->srv6_vpn)
 		num_sids = 1;
 
 	if (debug) {
@@ -658,8 +658,12 @@ leak_update(struct bgp *bgp, /* destination bgp instance */
 		if (!labelssame)
 			setlabels(bpi, label, num_labels);
 
-		if (num_sids)
-			setsids(bpi, &new_attr->sid , num_sids);
+		if (num_sids) {
+			if (new_attr->srv6_l3vpn)
+				setsids(bpi, &new_attr->srv6_l3vpn->sid, num_sids);
+			else if (new_attr->srv6_vpn)
+				setsids(bpi, &new_attr->srv6_vpn->sid, num_sids);
+		}
 
 		if (nexthop_self_flag)
 			bgp_path_info_set_flag(bn, bpi, BGP_PATH_ANNC_NH_SELF);
@@ -675,7 +679,6 @@ leak_update(struct bgp *bgp, /* destination bgp instance */
 		 * EVPN-imported routes that get leaked.
 		 */
 		if (bpi_ultimate->sub_type == BGP_ROUTE_REDISTRIBUTE ||
-		    !sid_zero(&bpi->attr->sid) ||
 		    is_pi_family_evpn(bpi_ultimate))
 			nh_valid = 1;
 		else
@@ -714,8 +717,12 @@ leak_update(struct bgp *bgp, /* destination bgp instance */
 
 	bgp_path_info_extra_get(new);
 
-	if (num_sids)
-		setsids(new, &new_attr->sid , num_sids);
+	if (num_sids) {
+		if (new_attr->srv6_l3vpn)
+			setsids(new, &new_attr->srv6_l3vpn->sid, num_sids);
+		else if (new_attr->srv6_vpn)
+			setsids(new, &new_attr->srv6_vpn->sid, num_sids);
+	}
 
 	if (num_labels)
 		setlabels(new, label, num_labels);
@@ -744,7 +751,6 @@ leak_update(struct bgp *bgp, /* destination bgp instance */
 	 * leaked.
 	 */
 	if (bpi_ultimate->sub_type == BGP_ROUTE_REDISTRIBUTE ||
-	    !sid_zero(&new->attr->sid) ||
 	    is_pi_family_evpn(bpi_ultimate))
 		nh_valid = 1;
 	else
@@ -968,14 +974,19 @@ void vpn_leak_from_vrf_update(struct bgp *bgp_vpn,	    /* to */
 	SET_FLAG(static_attr.flag, ATTR_FLAG_BIT(BGP_ATTR_ORIGINATOR_ID));
 	static_attr.originator_id = bgp_vpn->router_id;
 
+	/* Set SID for SRv6-VPN */
+	struct in6_addr *tovpn_sid = &bgp_vrf->vpn_policy[afi].tovpn_sid;
+	if (!sid_zero(tovpn_sid)) {
+		static_attr.srv6_l3vpn = XMALLOC(MTYPE_BGP_SRV6_VPN,
+					 sizeof(struct bgp_attr_srv6_vpn));
+		static_attr.srv6_l3vpn->sid_flags = 0x00;
+		static_attr.srv6_l3vpn->endpoint_behavior = 0xffff;
+		memcpy(&static_attr.srv6_l3vpn->sid, tovpn_sid, 16);
+	}
 
 	new_attr = bgp_attr_intern(
 		&static_attr);	/* hashed refcounted everything */
 	bgp_attr_flush(&static_attr); /* free locally-allocated parts */
-
-	struct in6_addr *tovpn_sid = &bgp_vrf->vpn_policy[afi].tovpn_sid;
-	if (!sid_zero(tovpn_sid))
-		memcpy(&new_attr->sid, tovpn_sid, 16);
 
 	if (debug && new_attr->ecommunity) {
 		char *s = ecommunity_ecom2str(new_attr->ecommunity,

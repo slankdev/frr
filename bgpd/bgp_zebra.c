@@ -1176,9 +1176,6 @@ static int update_ipv4nh_for_route_install(int nh_othervrf,
 		 api_nh->gate.ipv4.s_addr == INADDR_ANY) {
 		api_nh->type = NEXTHOP_TYPE_IFINDEX;
 		api_nh->ifindex = attr->nh_ifindex;
-	} else if (!sid_zero(&attr->sid)) {
-		api_nh->type = NEXTHOP_TYPE_IFINDEX;
-		api_nh->ifindex = vrf_id;
 	} else
 		api_nh->type = NEXTHOP_TYPE_IPV4;
 
