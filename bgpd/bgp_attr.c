@@ -1126,6 +1126,14 @@ void bgp_attr_flush(struct attr *attr)
 		encap_free(attr->encap_subtlvs);
 		attr->encap_subtlvs = NULL;
 	}
+	if (attr->srv6_vpn && !attr->srv6_vpn->refcnt) {
+		srv6_vpn_free(attr->srv6_vpn);
+		attr->srv6_vpn = NULL;
+	}
+	if (attr->srv6_l3vpn && !attr->srv6_l3vpn->refcnt) {
+		srv6_l3vpn_free(attr->srv6_l3vpn);
+		attr->srv6_l3vpn = NULL;
+	}
 #if ENABLE_BGP_VNC
 	if (attr->vnc_subtlvs && !attr->vnc_subtlvs->refcnt) {
 		encap_free(attr->vnc_subtlvs);
