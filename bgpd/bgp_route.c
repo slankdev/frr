@@ -1745,9 +1745,9 @@ int subgroup_announce_check(struct bgp_node *rn, struct bgp_path_info *pi,
 		SET_FLAG(attr->rmap_change_flags, BATTR_REFLECTED);
 
 #define NEXTHOP_IS_V6                                                          \
-	((safi != SAFI_ENCAP && safi != SAFI_MPLS_VPN                          \
+	((safi != SAFI_ENCAP                          \
 	  && (p->family == AF_INET6 || peer_cap_enhe(peer, afi, safi)))        \
-	 || ((safi == SAFI_ENCAP || safi == SAFI_MPLS_VPN)                     \
+	 || ((safi == SAFI_ENCAP)                     \
 	     && attr->mp_nexthop_len >= IPV6_MAX_BYTELEN))
 
 	/* IPv6/MP starts with 1 nexthop. The link-local address is passed only
