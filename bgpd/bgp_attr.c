@@ -2553,6 +2553,8 @@ static bgp_attr_parse_ret_t bgp_attr_psid_sub(uint8_t type, uint16_t length,
 	/* Placeholder code for Unsupported TLV */
 	else {
 
+		//TODO(slankdev): don't need parse complitly but, make it propagatable.
+
 		if (STREAM_READABLE(peer->curr) < length) {
 			flog_err(
 				EC_BGP_ATTR_LEN,
