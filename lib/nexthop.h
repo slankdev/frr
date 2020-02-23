@@ -26,6 +26,7 @@
 #include "prefix.h"
 #include "mpls.h"
 #include "vxlan.h"
+#include "srv6.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -134,6 +135,14 @@ struct nexthop {
 	union {
 		vni_t vni;
 	} nh_encap;
+
+	/* seg6 */
+	enum seg6_mode_t nh_seg6_mode;
+	struct seg6_segs *nh_seg6_segs;
+
+	/* seg6local */
+	enum seg6local_action_t nh_seg6local_action;
+	struct seg6local_context *nh_seg6local_ctx;
 };
 
 /* Backup index value is limited */
@@ -155,6 +164,12 @@ void nexthops_free(struct nexthop *nexthop);
 void nexthop_add_labels(struct nexthop *nexthop, enum lsp_types_t ltype,
 			uint8_t num_labels, const mpls_label_t *labels);
 void nexthop_del_labels(struct nexthop *);
+void nexthop_add_seg6(struct nexthop *nexthop, int mode, size_t num_segs,
+		      struct in6_addr *segs);
+void nexthop_del_seg6(struct nexthop *nexthop);
+void nexthop_add_seg6local(struct nexthop *nexthop, uint32_t action,
+			   const struct seg6local_context *ctx);
+void nexthop_del_seg6local(struct nexthop *nexthop);
 
 /*
  * Allocate a new nexthop object and initialize it from various args.
