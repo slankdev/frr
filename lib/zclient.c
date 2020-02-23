@@ -40,6 +40,7 @@
 #include "nexthop_group.h"
 #include "lib_errors.h"
 #include "srte.h"
+#include "srv6.h"
 
 DEFINE_MTYPE_STATIC(LIB, ZCLIENT, "Zclient")
 DEFINE_MTYPE_STATIC(LIB, REDIST_INST, "Redistribution instance IDs")
@@ -3787,6 +3788,26 @@ static int zclient_read(struct thread *thread)
 	case ZEBRA_MLAG_FORWARD_MSG:
 		zclient_mlag_handle_msg(command, zclient, length, vrf_id);
 		break;
+	case ZEBRA_SRV6_LOCATOR_ADD:
+		if (zclient->srv6_locator_add)
+			(*zclient->srv6_locator_add)(command, zclient, length,
+						     vrf_id);
+		break;
+	case ZEBRA_SRV6_LOCATOR_DELETE:
+		if (zclient->srv6_locator_delete)
+			(*zclient->srv6_locator_delete)(command, zclient,
+							length, vrf_id);
+		break;
+	case ZEBRA_SRV6_FUNCTION_ADD:
+		if (zclient->srv6_function_add)
+			(*zclient->srv6_function_add)(command, zclient, length,
+						      vrf_id);
+		break;
+	case ZEBRA_SRV6_FUNCTION_DELETE:
+		if (zclient->srv6_function_delete)
+			(*zclient->srv6_function_delete)(command, zclient,
+							 length, vrf_id);
+		break;
 	case ZEBRA_ERROR:
 		zclient_handle_error(command, zclient, length, vrf_id);
 		break;
@@ -4013,4 +4034,84 @@ int zclient_send_neigh_discovery_req(struct zclient *zclient,
 
 	stream_putw_at(s, 0, stream_get_endp(s));
 	return zclient_send_message(zclient);
+}
+
+int zclient_send_srv6_function(struct zclient *zclient,
+			       const struct srv6_function *function)
+{
+	struct stream *s;
+
+	s = zclient->obuf;
+	stream_reset(s);
+	zapi_srv6_function_encode(ZEBRA_SRV6_FUNCTION_ADD, s, function);
+	zclient_send_message(zclient);
+	return 0;
+}
+
+int zapi_srv6_locator_encode(uint8_t cmd, struct stream *s,
+			     const struct srv6_locator *locator)
+{
+	uint8_t namelen;
+
+	zclient_create_header(s, cmd, VRF_DEFAULT);
+	namelen = strlen(locator->name);
+	stream_putc(s, namelen);
+	stream_put(s, locator->name, namelen);
+	stream_put(s, &locator->prefix, sizeof(locator->prefix));
+	stream_putc(s, locator->function_bits_length);
+	stream_putw_at(s, 0, stream_get_endp(s));
+	return 0;
+}
+
+int zapi_srv6_locator_decode(struct stream *s, struct srv6_locator *locator)
+{
+	uint8_t namelen;
+
+	STREAM_GETC(s, namelen);
+	STREAM_GET(locator->name, s, namelen);
+	locator->name[namelen] = '\0';
+	STREAM_GET(&locator->prefix, s, sizeof(locator->prefix));
+	locator->function_bits_length = stream_getc(s);
+stream_failure:
+	return 0;
+}
+
+int zapi_srv6_function_encode(uint8_t cmd, struct stream *s,
+			      const struct srv6_function *function)
+{
+	uint8_t namelen;
+
+	zclient_create_header(s, cmd, VRF_DEFAULT);
+	namelen = strlen(function->locator_name);
+	stream_putc(s, namelen);
+	stream_put(s, function->locator_name, namelen);
+	stream_put(s, &function->prefix, sizeof(function->prefix));
+	stream_putc(s, function->owner_proto);
+	stream_putw(s, function->owner_instance);
+	stream_putl(s, function->request_key);
+	stream_putl(s, function->ifindex);
+	stream_putl(s, function->action);
+	stream_write(s, &function->ctx, sizeof(function->ctx));
+	stream_putc(s, function->explicit_allocate);
+	stream_putw_at(s, 0, stream_get_endp(s));
+	return 0;
+}
+
+int zapi_srv6_function_decode(struct stream *s, struct srv6_function *function)
+{
+	uint8_t namelen;
+
+	STREAM_GETC(s, namelen);
+	memset(function->locator_name, 0, sizeof(function->locator_name));
+	STREAM_GET(function->locator_name, s, namelen);
+	STREAM_GET(&function->prefix, s, sizeof(function->prefix));
+	STREAM_GETC(s, function->owner_proto);
+	STREAM_GETW(s, function->owner_instance);
+	STREAM_GETL(s, function->request_key);
+	STREAM_GETL(s, function->ifindex);
+	STREAM_GETL(s, function->action);
+	STREAM_GET(&function->ctx, s, sizeof(function->ctx));
+	STREAM_GETC(s, function->explicit_allocate);
+stream_failure:
+	return 0;
 }
