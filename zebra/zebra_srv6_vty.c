@@ -38,6 +38,7 @@
 #include "zebra/redistribute.h"
 #include "zebra/zebra_routemap.h"
 #include "zebra/zebra_dplane.h"
+#include "zebra/ge_netlink.h"
 
 
 static struct cmd_node sr_node = {
@@ -244,6 +245,43 @@ DEFUN_NOSH (srv6_locator,
 	return CMD_SUCCESS;
 }
 
+DEFUN_NOSH (segment_routing_srv6_encap,
+            segment_routing_srv6_encap_cmd,
+            "encapsulation",
+            "Segment Routing SRv6 encap\n")
+{
+	vty->node = SRV6_ENCAP_NODE;
+	return CMD_SUCCESS;
+}
+
+DEFUN (encapsulation_source_address,
+       encapsulation_source_address_cmd,
+       "source-address X:X::X:X",
+       "Configure srv6 tunnel source address\n"
+       "Specify source address\n")
+{
+	struct prefix_ipv6 cp;
+	int ret = str2prefix_ipv6(argv[1]->arg, &cp);
+	if (ret <= 0) {
+		vty_out(vty, "%% Malformed address \n");
+		return CMD_WARNING_CONFIG_FAILED;
+	}
+	assert(cp.prefixlen == 128);
+
+	struct zebra_ns *zns = zebra_ns_lookup(0);
+	if (!zns) {
+		vty_out(vty, "can't find zebra_ns\n");
+		return CMD_WARNING_CONFIG_FAILED;
+	}
+
+	dplane_srtunsrc_update(&cp.prefix);
+
+	struct srv6 *srv6 = srv6_get_default();
+	srv6->is_enable = true;
+	memcpy(&srv6->encap_src, &cp.prefix, sizeof(struct in6_addr));
+	return CMD_SUCCESS;
+}
+
 DEFUN (locator_prefix,
        locator_prefix_cmd,
        "prefix X:X::X:X/M [func-bits (8-64)]",
@@ -312,19 +350,23 @@ void zebra_srv6_vty_init(void)
 	install_node(&srv6_node, NULL);
 	install_node(&srv6_locs_node, NULL);
 	install_node(&srv6_loc_node, NULL);
+	install_node(&srv6_encap_node, NULL);
 	install_default(SR_NODE);
 	install_default(SRV6_NODE);
 	install_default(SRV6_LOCS_NODE);
 	install_default(SRV6_LOC_NODE);
+	install_default(SRV6_ENCAP_NODE);
 
 	/* Command for change node */
 	install_element(CONFIG_NODE, &segment_routing_cmd);
 	install_element(SR_NODE, &srv6_cmd);
 	install_element(SRV6_NODE, &srv6_locators_cmd);
 	install_element(SRV6_LOCS_NODE, &srv6_locator_cmd);
+	install_element(SRV6_NODE, &segment_routing_srv6_encap_cmd);
 
 	/* Command for configuration */
 	install_element(SRV6_LOC_NODE, &locator_prefix_cmd);
+	install_element(SRV6_ENCAP_NODE, &encapsulation_source_address_cmd);
 
 	/* Command for operation */
 	install_element(VIEW_NODE, &show_srv6_sid_cmd);

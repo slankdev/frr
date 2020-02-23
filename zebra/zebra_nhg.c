@@ -2019,6 +2019,8 @@ void zebra_nhg_dplane_result(struct zebra_dplane_ctx *ctx)
 	case DPLANE_OP_NEIGH_DELETE:
 	case DPLANE_OP_VTEP_ADD:
 	case DPLANE_OP_VTEP_DELETE:
+	case DPLANE_OP_SRTUNSRC_UPDATE:
+	case DPLANE_OP_SRTUNSRC_DELETE:
 	case DPLANE_OP_NONE:
 		break;
 	}
