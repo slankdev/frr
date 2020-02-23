@@ -1102,6 +1102,118 @@ static int build_label_stack(struct mpls_label_stack *nh_label,
 	return num_labels;
 }
 
+static void
+vrf_ip_route_add(struct prefix *prefix, uint32_t table_id)
+{
+	struct route_entry *re = XCALLOC(MTYPE_RE, sizeof(struct route_entry));
+	re->type = ZEBRA_ROUTE_STATIC;
+	re->instance = 0;
+	re->uptime = monotime(NULL);
+	re->vrf_id = VRF_DEFAULT;
+	re->table = RT_TABLE_MAIN;
+
+	struct nexthop_group *ng = NULL;
+	ng = nexthop_group_new();
+
+	ifindex_t ifindex = vrf_lookup_by_table(table_id, 0);
+	struct nexthop *nexthop = NULL;
+	nexthop = nexthop_from_ifindex(ifindex, VRF_DEFAULT);
+	nexthop_group_add_sorted(ng, nexthop);
+
+	int ret = rib_add_multipath(AFI_IP, SAFI_UNICAST, prefix, NULL, re, ng);
+	if (ret < 0)  {
+		zlog_err("%s: can't add RE entry to rib", __func__);
+	}
+}
+
+static void
+vrf_ip_route_del(struct prefix *prefix, uint32_t table_id)
+{
+	struct route_entry *re = XCALLOC(MTYPE_RE, sizeof(struct route_entry));
+	re->type = ZEBRA_ROUTE_STATIC;
+	re->instance = 0;
+	re->uptime = monotime(NULL);
+	re->vrf_id = VRF_DEFAULT;
+	re->table = RT_TABLE_MAIN;
+
+	struct nexthop_group *ng = NULL;
+	ng = nexthop_group_new();
+
+	ifindex_t ifindex = vrf_lookup_by_table(table_id, 0);
+	struct nexthop *nexthop = NULL;
+	nexthop = nexthop_from_ifindex(ifindex, VRF_DEFAULT);
+	nexthop_group_add_sorted(ng, nexthop);
+
+	rib_delete(AFI_IP, SAFI_UNICAST, VRF_DEFAULT, ZEBRA_ROUTE_STATIC,
+			0, 0, prefix, NULL, nexthop, 0, RT_TABLE_MAIN, 20, 1, true);
+}
+
+static uint32_t
+get_pseudo_dt4_vrf_ip(uint32_t table_id)
+{
+	struct srv6 *srv6 = srv6_get_default();
+	if (!srv6 || !srv6->is_enable || !srv6->vrf_ip.plist)
+		return 0;
+
+	for (struct prefix_list_entry *pentry = srv6->vrf_ip.plist->head;
+			 pentry; pentry = pentry->next) {
+		char buf[BUFSIZ];
+		struct prefix *p = &pentry->prefix;
+		inet_ntop(p->family, p->u.val, buf, BUFSIZ);
+
+		in_addr_t val = p->u.prefix4.s_addr;
+
+		struct prefix_ipv4 *prefix_beg = prefix_ipv4_new();
+		prefix_beg->prefixlen = p->prefixlen;
+		prefix_beg->prefix.s_addr = val;
+		apply_mask_ipv4(prefix_beg);
+
+		in_addr_t beg = prefix_beg->prefix.s_addr;
+		in_addr_t end = ipv4_broadcast_addr(val, p->prefixlen);
+		for (in_addr_t i = beg;
+		     ntohl(i) <= ntohl(end);
+				 i = htonl(ntohl(i) + 1)) {
+			char s[128];
+			inet_ntop(AF_INET, &i, s, 128);
+
+			struct prefix key;
+			memset(&key, 0, sizeof(key));
+			key.family = AF_INET;
+			key.prefixlen = 32;
+			key.u.prefix4.s_addr = i;
+			struct route_node *rn = route_node_lookup(srv6->vrf_ip.table, &key);
+			if (!rn) {
+				rn = route_node_get(srv6->vrf_ip.table, &key);
+				rn->info = malloc(sizeof(uint32_t));
+				*(uint32_t*)rn->info = table_id;
+				vrf_ip_route_add(&key, table_id);
+				return i;
+			}
+		}
+	}
+	return 0;
+}
+
+static void
+free_pseudo_dt4_vrf_ip(uint32_t table_id)
+{
+	struct srv6 *srv6 = srv6_get_default();
+	if (!srv6 || !srv6->is_enable || !srv6->vrf_ip.plist)
+		return;
+
+	for (struct route_node *rn = route_top(srv6->vrf_ip.table);
+			 rn; rn = route_next(rn)) {
+		uint32_t tmp_table_id = *(uint32_t*)rn->info;
+		if (tmp_table_id == table_id) {
+			vrf_ip_route_del(&rn->p, table_id);
+			free(rn->info);
+			rn->info = NULL;
+			route_unlock_node(rn);
+			return;
+		}
+	}
+}
+
 /* This function takes a nexthop as argument and adds
  * the appropriate netlink attributes to an existing
  * netlink message.
@@ -1160,6 +1272,7 @@ static void _netlink_route_build_singlepath(const char *routedesc, int bytelen,
 	if (nexthop->nh_seg6local_ctx) {
 		uint32_t action;
 		uint16_t encap;
+		uint32_t table_redirect_nh4;
 		struct rtattr *nest;
 		const struct seg6local_context *ctx;
 
@@ -1187,10 +1300,21 @@ static void _netlink_route_build_singlepath(const char *routedesc, int bytelen,
 			addattr_l(nlmsg, req_size, SEG6_LOCAL_NH4,
 				  &ctx->nh4, sizeof(struct in_addr));
 			break;
+
+		//TODO(slankdev): use pseudo End.DT4 behaviour
+		case ZEBRA_SEG6_LOCAL_ACTION_END_DT4:
+			table_redirect_nh4 = get_pseudo_dt4_vrf_ip(ctx->table);
+			addattr32(nlmsg, req_size, SEG6_LOCAL_ACTION,
+				  SEG6_LOCAL_ACTION_END_DX4);
+			addattr_l(nlmsg, req_size, SEG6_LOCAL_NH4,
+				  &table_redirect_nh4, sizeof(struct in_addr));
+			break;
+
 		default:
 			zlog_err("%s: unsupport seg6local behaviour action=%u",
 				 __func__, action);
 			break;
+
 		}
 		addattr_nest_end(nlmsg, nest);
 	}
@@ -1658,6 +1782,17 @@ static int netlink_route_multipath(int cmd, struct zebra_dplane_ctx *ctx)
 
 	_netlink_route_debug(cmd, p, family, dplane_ctx_get_vrf(ctx), table_id);
 
+	if (cmd == RTM_DELROUTE) {
+		struct nexthop *nexthop = NULL;
+		for (ALL_NEXTHOPS_PTR(dplane_ctx_get_ng(ctx), nexthop)) {
+			if (nexthop->nh_seg6local_action == ZEBRA_SEG6_LOCAL_ACTION_END_DT4) {
+				const struct seg6local_context *ctx = nexthop->nh_seg6local_ctx;
+				free_pseudo_dt4_vrf_ip(ctx->table);
+				break;
+			}
+		}
+	}
+
 	/*
 	 * If we are not updating the route and we have received
 	 * a route delete, then all we need to fill in is the
@@ -2118,6 +2253,7 @@ static int netlink_nexthop(int cmd, struct zebra_dplane_ctx *ctx)
 			if (nh->nh_seg6local_ctx) {
 				uint32_t action;
 				uint16_t encap;
+				uint32_t table_redirect_nh4;
 				struct rtattr *nest;
 				const struct seg6local_context *ctx;
 
@@ -2152,6 +2288,19 @@ static int netlink_nexthop(int cmd, struct zebra_dplane_ctx *ctx)
 						  SEG6_LOCAL_NH4, &ctx->nh4,
 						  sizeof(struct in_addr));
 					break;
+
+				//TODO(slankdev): use pseudo End.DT4 behaviour
+				case SEG6_LOCAL_ACTION_END_DT4:
+					table_redirect_nh4 = get_pseudo_dt4_vrf_ip(ctx->table);
+					addattr32(&req.n, req_size,
+						  SEG6_LOCAL_ACTION,
+						  SEG6_LOCAL_ACTION_END_DX4);
+					addattr_l(&req.n, req_size,
+						  SEG6_LOCAL_NH4,
+						  &table_redirect_nh4,
+						  sizeof(struct in_addr));
+					break;
+
 				default:
 					zlog_err("%s: unsupport seg6local behaviour action=%u",
 						 __func__, action);

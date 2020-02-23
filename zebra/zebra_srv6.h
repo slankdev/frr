@@ -29,10 +29,16 @@
 #include <pthread.h>
 #include <plist.h>
 
+struct pseudo_dt4_vrf_ip {
+	struct prefix_list *plist;
+	struct route_table *table;
+};
+
 /* SRv6 instance structure. */
 struct zebra_srv6 {
 	struct in6_addr encap_src;
 	struct list *locators;
+	struct pseudo_dt4_vrf_ip vrf_ip;
 };
 
 extern void zebra_srv6_locator_add(struct srv6_locator *locator);
