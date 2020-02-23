@@ -1225,6 +1225,8 @@ static struct cmd_node srv6_encap_node = {
 	SRV6_ENCAP_NODE, "%s(config-srv6-encap)# ",
 };
 
+static struct cmd_node bgp_srv6_node = { BGP_SRV6_NODE, "%s(config-router-srv6)# ", };
+
 static struct cmd_node rmap_node = {RMAP_NODE, "%s(config-route-map)# "};
 
 static struct cmd_node pbr_map_node = {PBRMAP_NODE, "%s(config-pbr-map)# "};
@@ -2078,6 +2080,29 @@ DEFUNSH(VTYSH_ZEBRA, exit_srv6_encap_config, exit_srv6_encap_config_cmd, "exit",
 		vty->node = SRV6_NODE;
 	return CMD_SUCCESS;
 }
+
+DEFUNSH(VTYSH_BGPD,
+        bgp_segment_routing_srv6,
+        bgp_segment_routing_srv6_cmd,
+        "segment-routing srv6",
+        "Segment-Routing configuration\n"
+        "Segment-Routing SRv6 configuration\n")
+{
+	vty->node = BGP_SRV6_NODE;
+	return CMD_SUCCESS;
+}
+
+DEFUNSH(VTYSH_BGPD,
+        exit_bgp_segment_routing_srv6,
+        exit_bgp_segment_routing_srv6_cmd,
+        "exit",
+        "exit Segment-Routing SRv6 configuration\n")
+{
+	if (vty->node == BGP_SRV6_NODE)
+		vty->node = BGP_NODE;
+	return CMD_SUCCESS;
+}
+
 
 DEFUNSH(VTYSH_BGPD, exit_vrf_policy, exit_vrf_policy_cmd, "exit-vrf-policy",
 	"Exit from VRF policy configuration mode\n")
@@ -3894,6 +3919,7 @@ void vtysh_init_vty(void)
 	install_node(&srv6_locs_node, NULL);
 	install_node(&srv6_loc_node, NULL);
 	install_node(&srv6_encap_node, NULL);
+	install_node(&bgp_srv6_node, NULL);
 
 	struct cmd_node *node;
 	for (unsigned int i = 0; i < vector_active(cmdvec); i++) {
@@ -4152,6 +4178,10 @@ void vtysh_init_vty(void)
 	install_element(SRV6_LOC_NODE, &exit_srv6_loc_config_cmd);
 	install_element(SRV6_LOC_NODE, &vtysh_end_all_cmd);
 	install_element(SRV6_ENCAP_NODE, &exit_srv6_encap_config_cmd);
+
+	/* SRv6 BGP Control-plane */
+	install_element(BGP_NODE, &bgp_segment_routing_srv6_cmd);
+	install_element(BGP_SRV6_NODE, &exit_bgp_segment_routing_srv6_cmd);
 
 	install_element(BGP_VRF_POLICY_NODE, &exit_vrf_policy_cmd);
 	install_element(BGP_VNC_DEFAULTS_NODE, &exit_vnc_config_cmd);
