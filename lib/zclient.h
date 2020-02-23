@@ -37,6 +37,7 @@
 #include "pw.h"
 
 #include "mlag.h"
+#include "srv6.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -199,6 +200,10 @@ typedef enum {
 	ZEBRA_MLAG_CLIENT_REGISTER,
 	ZEBRA_MLAG_CLIENT_UNREGISTER,
 	ZEBRA_MLAG_FORWARD_MSG,
+	ZEBRA_SRV6_LOCATOR_ADD,
+	ZEBRA_SRV6_LOCATOR_DELETE,
+	ZEBRA_SRV6_FUNCTION_ADD,
+	ZEBRA_SRV6_FUNCTION_DELETE,
 	ZEBRA_ERROR,
 	ZEBRA_CLIENT_CAPABILITIES,
 	ZEBRA_OPAQUE_MESSAGE,
@@ -341,6 +346,10 @@ struct zclient {
 	int (*mlag_process_up)(void);
 	int (*mlag_process_down)(void);
 	int (*mlag_handle_msg)(struct stream *msg, int len);
+	int (*srv6_locator_add)(ZAPI_CALLBACK_ARGS);
+	int (*srv6_locator_delete)(ZAPI_CALLBACK_ARGS);
+	int (*srv6_function_add)(ZAPI_CALLBACK_ARGS);
+	int (*srv6_function_delete)(ZAPI_CALLBACK_ARGS);
 	int (*handle_error)(enum zebra_error_types error);
 	int (*opaque_msg_handler)(ZAPI_CALLBACK_ARGS);
 	int (*opaque_register_handler)(ZAPI_CALLBACK_ARGS);
@@ -810,6 +819,17 @@ bool zapi_rule_notify_decode(struct stream *s, uint32_t *seqno,
 bool zapi_ipset_notify_decode(struct stream *s,
 			      uint32_t *unique,
 			     enum zapi_ipset_notify_owner *note);
+
+extern int zapi_srv6_locator_encode(uint8_t cmd, struct stream *s,
+				    const struct srv6_locator *locator);
+extern int zapi_srv6_locator_decode(struct stream *s,
+				    struct srv6_locator *locator);
+extern int zapi_srv6_function_encode(uint8_t cmd, struct stream *s,
+				     const struct srv6_function *function);
+extern int zapi_srv6_function_decode(struct stream *s,
+				     struct srv6_function *function);
+extern int zclient_send_srv6_function(struct zclient *zclient,
+				      const struct srv6_function *function);
 
 #define ZEBRA_IPSET_NAME_SIZE   32
 
