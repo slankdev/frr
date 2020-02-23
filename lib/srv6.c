@@ -22,6 +22,10 @@
 #include "srv6.h"
 #include "log.h"
 
+DEFINE_QOBJ_TYPE(srv6_locator)
+DEFINE_MTYPE_STATIC(LIB, SRV6_LOCATOR, "SRV6 locator")
+DEFINE_MTYPE_STATIC(LIB, SRV6_LOCATOR_CHUNK, "SRV6 locator chunk")
+
 const char *seg6local_action2str(uint32_t action)
 {
 	switch (action) {
@@ -115,4 +119,33 @@ const char *seg6local_context2str(char *str, size_t size,
 		snprintf(str, size, "unknown(%s)", __func__);
 		return str;
 	}
+}
+
+struct srv6_locator *srv6_locator_alloc(const char *name)
+{
+	struct srv6_locator *locator = NULL;
+
+	locator = XCALLOC(MTYPE_SRV6_LOCATOR, sizeof(struct srv6_locator));
+	strlcpy(locator->name, name, sizeof(locator->name));
+	locator->chunks = list_new();
+	QOBJ_REG(locator, srv6_locator);
+	return locator;
+}
+
+struct srv6_locator_chunk *srv6_locator_chunk_alloc(void)
+{
+	struct srv6_locator_chunk *chunk = NULL;
+
+	chunk = XCALLOC(MTYPE_SRV6_LOCATOR_CHUNK, sizeof(struct srv6_locator_chunk));
+	return chunk;
+}
+
+void srv6_locator_free(struct srv6_locator *locator)
+{
+	XFREE(MTYPE_SRV6_LOCATOR, locator);
+}
+
+void srv6_locator_chunk_free(struct srv6_locator_chunk *chunk)
+{
+	XFREE(MTYPE_SRV6_LOCATOR_CHUNK, chunk);
 }
