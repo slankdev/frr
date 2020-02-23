@@ -170,6 +170,67 @@ DEFUN (show_segment_routing_srv6_locator,
 	return CMD_SUCCESS;
 }
 
+DEFUN (show_segment_routing_srv6_manager,
+       show_segment_routing_srv6_manager_cmd,
+       "show segment-routing srv6 manager [json]",
+       SHOW_STR
+       "Segment Routing\n"
+       "Segment Routing SRv6\n"
+       "Manager Information\n"
+       JSON_STR)
+{
+	const bool uj = use_json(argc, argv);
+	json_object *json = NULL;
+	json_object *json_vrf_ip_table = NULL;
+
+	if (uj) {
+		json = json_object_new_object();
+		json_vrf_ip_table = json_object_new_array();
+		json_object_object_add(json, "pseudo_end_dt4_plist", json_vrf_ip_table);
+	} else
+		vty_out(vty, "\n");
+
+	char str[256];
+	struct srv6 *srv6 = srv6_get_default();
+	inet_ntop(AF_INET6, &srv6->encap_src, str, sizeof(str));
+
+	if (uj) {
+		json_object_string_add(json, "tunSrc", str);
+		json_object_string_add(json, "pseudo_end_dt4_plist_name",
+				srv6->vrf_ip.plist ? prefix_list_name(srv6->vrf_ip.plist) : "n/a");
+	} else {
+		vty_out(vty, "SRv6 Encap Source: %s\n", str);
+		vty_out(vty, "SRv6 pseudo End.DT4 vrf_ip prefix-list: %s\n",
+				srv6->vrf_ip.plist ? prefix_list_name(srv6->vrf_ip.plist) : "n/a");
+		vty_out(vty, "\n");
+		vty_out(vty, "vrf-ip table:\n");
+	}
+
+	for (struct route_node *rn = route_top(srv6->vrf_ip.table);
+			 rn; rn = route_next(rn)) {
+		if (!rn->info)
+			continue;
+		char s[128];
+		prefix2str(&rn->p, s, 128);
+
+		if (uj) {
+			json_object *json_vrf_ip = json_object_new_object();
+			json_object_string_add(json_vrf_ip, "prefix", s);
+			json_object_int_add(json_vrf_ip, "table", *(uint32_t*)rn->info);
+			json_object_array_add(json_vrf_ip_table, json_vrf_ip);
+		} else
+			vty_out(vty, "%s: %u\n", s, *(uint32_t*)rn->info);
+	}
+
+	if (uj) {
+		vty_out(vty, "%s\n", json_object_to_json_string_ext(json, JSON_C_TO_STRING_PRETTY));
+		json_object_free(json);
+	} else
+		vty_out(vty, "\n");
+
+	return CMD_SUCCESS;
+}
+
 DEFUN_NOSH (segment_routing,
             segment_routing_cmd,
             "segment-routing",
@@ -382,4 +443,5 @@ void zebra_srv6_vty_init(void)
 	/* Command for operation */
 	install_element(VIEW_NODE, &show_segment_routing_srv6_sid_cmd);
 	install_element(VIEW_NODE, &show_segment_routing_srv6_locator_cmd);
+	install_element(VIEW_NODE, &show_segment_routing_srv6_manager_cmd);
 }
