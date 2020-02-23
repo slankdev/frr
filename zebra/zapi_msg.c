@@ -1684,6 +1684,22 @@ static void zread_route_add(ZAPI_HANDLER_ARGS)
 					   &api_nh->labels[0]);
 		}
 
+		if (CHECK_FLAG(api.flags, ZEBRA_FLAG_SEG6_ROUTE)
+		    && api_nh->type != NEXTHOP_TYPE_BLACKHOLE) {
+
+			if (IS_ZEBRA_DEBUG_RECV) {
+				char str[128];
+				inet_ntop(AF_INET6, &api_nh->seg6_segs[0], str, 128);
+				zlog_debug(
+					"%s: adding %d sids (1st=%s)",
+					__func__, api_nh->seg6_segs_num, str);
+			}
+
+			uint32_t seg6_mode = 1; /* Encap */
+			nexthop_add_seg6(nexthop, seg6_mode,
+					api_nh->seg6_segs_num, api_nh->seg6_segs);
+		}
+
 		if (CHECK_FLAG(api.flags, ZEBRA_FLAG_SEG6LOCAL_ROUTE)
 		    && api_nh->type != NEXTHOP_TYPE_BLACKHOLE) {
 			if (IS_ZEBRA_DEBUG_RECV)

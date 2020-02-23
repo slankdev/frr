@@ -320,6 +320,34 @@ static vrf_id_t vrf_lookup_by_table(uint32_t table_id, ns_id_t ns_id)
 }
 
 /**
+ * @parse_encap_seg6() - Parses encapsulated seg6 attributes
+ * @tb:         Pointer to rtattr to look for nested items in.
+ * @mode:       SEG6_IPTUN_MODE_{0:INLINE,1:ENCAP,2:L2ENCAP}
+ * @segs:       segs array in6_addr format sized 256.
+ *
+ * Return:      Number of segs.
+ */
+static int parse_encap_seg6(struct rtattr *tb,
+		uint32_t *mode, struct in6_addr *segs)
+{
+	struct rtattr *tb_encap[200] = {0};
+	netlink_parse_rtattr_nested(tb_encap, 200, tb);
+
+	struct seg6_iptunnel_encap *seg =
+		(struct seg6_iptunnel_encap*)tb_encap[SEG6_IPTUNNEL_SRH]+1;
+	*mode = seg->mode;
+	struct ipv6_sr_hdr *srh = seg->srh;
+
+	size_t n_segs = srh->hdrlen / 2;
+	for (size_t i=0; i<n_segs; i++) {
+		char str[128];
+		inet_ntop(AF_INET6, &srh->segments[i], str, sizeof(str));
+		memcpy(&segs[i], &srh->segments[i], sizeof(struct in6_addr));
+	}
+	return n_segs;
+}
+
+/**
  * @parse_encap_mpls() - Parses encapsulated mpls attributes
  * @tb:         Pointer to rtattr to look for nested items in.
  * @labels:     Pointer to store labels in.
@@ -355,6 +383,9 @@ parse_nexthop_unicast(ns_id_t ns_id, struct rtmsg *rtm, struct rtattr **tb,
 	struct nexthop nh = {0};
 	mpls_label_t labels[MPLS_MAX_LABELS] = {0};
 	int num_labels = 0;
+	struct in6_addr segs[256];
+	int num_segs = 0;
+	uint32_t seg6_mode;
 
 	vrf_id_t nh_vrf_id = vrf_id;
 	size_t sz = (afi == AFI_IP) ? 4 : 16;
@@ -393,6 +424,10 @@ parse_nexthop_unicast(ns_id_t ns_id, struct rtmsg *rtm, struct rtattr **tb,
 	    && *(uint16_t *)RTA_DATA(tb[RTA_ENCAP_TYPE])
 		       == LWTUNNEL_ENCAP_MPLS) {
 		num_labels = parse_encap_mpls(tb[RTA_ENCAP], labels);
+	} else if (tb[RTA_ENCAP] && tb[RTA_ENCAP_TYPE]
+	    && *(uint16_t *)RTA_DATA(tb[RTA_ENCAP_TYPE])
+		       == LWTUNNEL_ENCAP_SEG6) {
+		num_segs = parse_encap_seg6(tb[RTA_ENCAP], &seg6_mode, segs);
 	}
 
 	if (rtm->rtm_flags & RTNH_F_ONLINK)
@@ -400,6 +435,8 @@ parse_nexthop_unicast(ns_id_t ns_id, struct rtmsg *rtm, struct rtattr **tb,
 
 	if (num_labels)
 		nexthop_add_labels(&nh, ZEBRA_LSP_STATIC, num_labels, labels);
+	else if (num_segs)
+		nexthop_add_seg6(&nh, seg6_mode, num_segs, segs);
 
 	return nh;
 }
@@ -417,6 +454,9 @@ static uint8_t parse_multipath_nexthops_unicast(ns_id_t ns_id,
 	/* MPLS labels */
 	mpls_label_t labels[MPLS_MAX_LABELS] = {0};
 	int num_labels = 0;
+	uint32_t num_segs = 0;
+	uint32_t seg6_mode = 0; /* 1:encap, 2:insert */
+	struct in6_addr segs[256];
 	struct rtattr *rtnh_tb[RTA_MAX + 1] = {};
 
 	int len = RTA_PAYLOAD(tb[RTA_MULTIPATH]);
@@ -462,6 +502,11 @@ static uint8_t parse_multipath_nexthops_unicast(ns_id_t ns_id,
 				       == LWTUNNEL_ENCAP_MPLS) {
 				num_labels = parse_encap_mpls(
 					rtnh_tb[RTA_ENCAP], labels);
+			} else if (rtnh_tb[RTA_ENCAP] && rtnh_tb[RTA_ENCAP_TYPE]
+			    && *(uint16_t *)RTA_DATA(rtnh_tb[RTA_ENCAP_TYPE])
+				       == LWTUNNEL_ENCAP_SEG6) {
+				num_segs = parse_encap_seg6(
+					rtnh_tb[RTA_ENCAP], &seg6_mode, segs);
 			}
 		}
 
@@ -487,6 +532,8 @@ static uint8_t parse_multipath_nexthops_unicast(ns_id_t ns_id,
 			if (num_labels)
 				nexthop_add_labels(nh, ZEBRA_LSP_STATIC,
 						   num_labels, labels);
+			else if (num_segs)
+				nexthop_add_seg6(nh, seg6_mode, num_segs, segs);
 
 			if (rtnh->rtnh_flags & RTNH_F_ONLINK)
 				SET_FLAG(nh->flags, NEXTHOP_FLAG_ONLINK);
@@ -1214,6 +1261,24 @@ free_pseudo_dt4_vrf_ip(uint32_t table_id)
 	}
 }
 
+static struct ipv6_sr_hdr *parse_srh(bool encap,
+    size_t num_segs, const struct in6_addr *segs)
+{
+  const size_t srhlen = 8 + sizeof(struct in6_addr)*(encap ? num_segs+1 : num_segs);
+
+  struct ipv6_sr_hdr *srh = malloc(srhlen);
+  memset(srh, 0, srhlen);
+  srh->hdrlen = (srhlen >> 3) - 1;
+  srh->type = 4;
+  srh->segments_left = encap ? num_segs : num_segs - 1;
+  srh->first_segment = encap ? num_segs : num_segs - 1;
+
+  size_t srh_idx = encap ? 1 : 0;
+  for (ssize_t i=num_segs-1; i>=0; i--)
+    memcpy(&srh->segments[srh_idx + i], &segs[num_segs - 1 - i], sizeof(struct in6_addr));
+  return srh;
+}
+
 /* This function takes a nexthop as argument and adds
  * the appropriate netlink attributes to an existing
  * netlink message.
@@ -1267,6 +1332,42 @@ static void _netlink_route_build_singlepath(const char *routedesc, int bytelen,
 				  num_labels * sizeof(mpls_lse_t));
 			addattr_nest_end(nlmsg, nest);
 		}
+	}
+
+	struct seg6_segs *nh_segs;
+	struct in6_addr out_segs[SRV6_MAX_SIDS];
+	int num_sids = 0;
+	char sid_buf[256];
+
+	nh_segs = nexthop->nh_seg6_segs;
+	for (size_t i = 0; nh_segs && i < nh_segs->num_segs; i++) {
+		if (IS_ZEBRA_DEBUG_KERNEL) {
+			char str[128];
+			sid2str(&nh_segs->segs[i], str, sizeof(str));
+			sprintf(sid_buf, "segs[%zd] %s", i, str);
+		}
+
+		sid_copy(&out_segs[num_labels], &nh_segs->segs[i]);
+		num_sids++;
+	}
+
+	if (num_sids) {
+		char tuninfo_buffer[4096];
+		struct rtattr *nest;
+		uint16_t encap = LWTUNNEL_ENCAP_SEG6;
+		addattr_l(nlmsg, req_size, RTA_ENCAP_TYPE, &encap, sizeof(uint16_t));
+		nest = addattr_nest(nlmsg, req_size, RTA_ENCAP);
+
+		struct ipv6_sr_hdr *srh = parse_srh(false, num_sids, out_segs);
+		size_t srhlen = (srh->hdrlen + 1) << 3;
+		struct seg6_iptunnel_encap *tuninfo = (struct seg6_iptunnel_encap*)tuninfo_buffer;
+		memset(tuninfo, 0, sizeof(*tuninfo) + srhlen);
+		memcpy(tuninfo->srh, srh, srhlen);
+		tuninfo->mode = SEG6_IPTUN_MODE_ENCAP;
+		addattr_l(nlmsg, req_size, SEG6_IPTUNNEL_SRH,
+				tuninfo, sizeof(*tuninfo) + srhlen);
+
+		addattr_nest_end(nlmsg, nest);
 	}
 
 	if (nexthop->nh_seg6local_ctx) {
@@ -1341,8 +1442,8 @@ static void _netlink_route_build_singlepath(const char *routedesc, int bytelen,
 		if (IS_ZEBRA_DEBUG_KERNEL)
 			zlog_debug(
 				" 5549: _netlink_route_build_singlepath() (%s): "
-				"nexthop via %s %s if %u(%u)",
-				routedesc, ipv4_ll_buf, label_buf,
+				"nexthop via %s %s %s if %u(%u)",
+				routedesc, ipv4_ll_buf, label_buf, sid_buf,
 				nexthop->ifindex, nexthop->vrf_id);
 		return;
 	}
@@ -1490,6 +1591,13 @@ static void _netlink_route_build_multipath(const char *routedesc, int bytelen,
 			rta_nest_end(rta, nest);
 			rtnh->rtnh_len += rta->rta_len - len;
 		}
+	}
+
+	struct seg6_segs *nh_segs;
+	nh_segs = nexthop->nh_seg6_segs;
+	if (nh_segs->num_segs) {
+		zlog_debug("%s:%d:%s: this function isn't support yet",
+				__FILE__, __LINE__, __func__);
 	}
 
 	if (CHECK_FLAG(nexthop->flags, NEXTHOP_FLAG_ONLINK))
@@ -2248,6 +2356,28 @@ static int netlink_nexthop(int cmd, struct zebra_dplane_ctx *ctx)
 							  * sizeof(mpls_lse_t));
 					addattr_nest_end(&req.n, nest);
 				}
+			}
+
+			if (nh->nh_seg6_segs) {
+				char tuninfo_buffer[4096];
+				struct rtattr *nest;
+				uint16_t encap = LWTUNNEL_ENCAP_SEG6;
+				addattr_l(&req.n, req_size, NHA_ENCAP_TYPE, &encap, sizeof(uint16_t));
+				nest = addattr_nest(&req.n, req_size, NHA_ENCAP | NLA_F_NESTED);
+
+				struct ipv6_sr_hdr *srh = parse_srh(false,
+						nh->nh_seg6_segs->num_segs,
+						nh->nh_seg6_segs->segs);
+				size_t srhlen = (srh->hdrlen + 1) << 3;
+				struct seg6_iptunnel_encap *tuninfo = (struct seg6_iptunnel_encap*)tuninfo_buffer;
+				memset(tuninfo, 0, sizeof(*tuninfo) + srhlen);
+				memcpy(tuninfo->srh, srh, srhlen);
+
+				tuninfo->mode = SEG6_IPTUN_MODE_ENCAP;
+				addattr_l(&req.n, req_size, SEG6_IPTUNNEL_SRH,
+						tuninfo, sizeof(*tuninfo) + srhlen);
+
+				addattr_nest_end(&req.n, nest);
 			}
 
 			if (nh->nh_seg6local_ctx) {
