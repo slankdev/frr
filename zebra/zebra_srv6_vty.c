@@ -261,6 +261,34 @@ DEFUN (encapsulation_source_address,
 	return CMD_SUCCESS;
 }
 
+DEFUN (pseudo_dt4_dummy_ip,
+       pseudo_dt4_dummy_ip_cmd,
+       "[no] pseudo-dt4-dummy-ip WORD",
+       NO_STR
+       "Specify dummy-ip-range for pseudo End.DT4\n"
+       "Specify prefix-list-name\n")
+{
+	int idx = 0;
+	bool negate = false;
+	if (argv_find(argv, argc, "no", &idx))
+		negate = true;
+
+	struct srv6 *srv6 = srv6_get_default();
+	if (negate) {
+		vty_out(vty, "this command doesn't supported\n");
+		return CMD_WARNING_CONFIG_FAILED;
+	}
+
+	const char *plist_name = argv[negate?2:1]->arg;
+	struct prefix_list *plist = prefix_list_lookup(AFI_IP, plist_name);
+	if (!plist) {
+		vty_out(vty, "no such prefix-list (%s)\n", plist_name);
+		return CMD_WARNING_CONFIG_FAILED;
+	}
+	srv6->vrf_ip.plist = plist;
+	return CMD_SUCCESS;
+}
+
 DEFUN (locator_prefix,
        locator_prefix_cmd,
        "prefix X:X::X:X/M [func-bits (8-64)]",
@@ -314,6 +342,10 @@ static int zebra_sr_config(struct vty *vty)
 			vty_out(vty, "   !\n");
 		}
 		vty_out(vty, "  !\n");
+
+		if (srv6->vrf_ip.plist)
+			vty_out(vty, "  pseudo-dt4-dummy-ip %s\n",
+					prefix_list_name(srv6->vrf_ip.plist));
 		vty_out(vty, " !\n");
 		vty_out(vty, "!\n");
 	}
@@ -345,6 +377,7 @@ void zebra_srv6_vty_init(void)
 	/* Command for configuration */
 	install_element(SRV6_LOC_NODE, &locator_prefix_cmd);
 	install_element(SRV6_ENCAP_NODE, &encapsulation_source_address_cmd);
+	install_element(SRV6_NODE, &pseudo_dt4_dummy_ip_cmd);
 
 	/* Command for operation */
 	install_element(VIEW_NODE, &show_segment_routing_srv6_sid_cmd);

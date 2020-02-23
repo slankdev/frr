@@ -144,6 +144,16 @@ static void get_function_addr(struct in6_addr *locator,
 
 static int zebra_srv6_cleanup(struct zserv *client)
 {
+	struct srv6 *srv6 = srv6_get_default();
+	if (!srv6 || !srv6->is_enable || !srv6->vrf_ip.plist)
+		return 0;
+
+	for (struct route_node *rn = route_top(srv6->vrf_ip.table);
+			 rn; rn = route_next(rn)) {
+		free(rn->info);
+		rn->info = NULL;
+		route_unlock_node(rn);
+	}
 	return 0;
 }
 
@@ -325,6 +335,7 @@ struct srv6 *srv6_get_default(void)
 	if (first_execution) {
 		srv6.is_enable = false;
 		first_execution = false;
+		srv6.vrf_ip.table = route_table_init();
 		srv6.locators = list_new();
 	}
 	return &srv6;
