@@ -1221,6 +1221,10 @@ static struct cmd_node srv6_loc_node = {
 	SRV6_LOC_NODE, "%s(config-srv6-locator)# ",
 };
 
+static struct cmd_node srv6_encap_node = {
+	SRV6_ENCAP_NODE, "%s(config-srv6-encap)# ",
+};
+
 static struct cmd_node rmap_node = {RMAP_NODE, "%s(config-route-map)# "};
 
 static struct cmd_node pbr_map_node = {PBRMAP_NODE, "%s(config-pbr-map)# "};
@@ -1381,6 +1385,14 @@ DEFUNSH(VTYSH_SR, srv6_locators_locator, srv6_locators_locator_cmd,
 	"Specify locator-name\n")
 {
 	vty->node = SRV6_LOC_NODE;
+	return CMD_SUCCESS;
+}
+
+DEFUNSH(VTYSH_ZEBRA, segment_routing_ipv6_encap, segment_routing_ipv6_encap_cmd,
+	"encapsulation",
+	"Segment-Routing SRv6 encap configration\n")
+{
+	vty->node = SRV6_ENCAP_NODE;
 	return CMD_SUCCESS;
 }
 
@@ -2056,6 +2068,14 @@ DEFUNSH(VTYSH_SR, exit_srv6_loc_config, exit_srv6_loc_config_cmd, "exit",
 {
 	if (vty->node == SRV6_LOC_NODE)
 		vty->node = SRV6_LOCS_NODE;
+	return CMD_SUCCESS;
+}
+
+DEFUNSH(VTYSH_ZEBRA, exit_srv6_encap_config, exit_srv6_encap_config_cmd, "exit",
+	"Exit from SRv6-encap configuration mode\n")
+{
+	if (vty->node == SRV6_ENCAP_NODE)
+		vty->node = SRV6_NODE;
 	return CMD_SUCCESS;
 }
 
@@ -3873,6 +3893,7 @@ void vtysh_init_vty(void)
 	install_node(&srv6_node, NULL);
 	install_node(&srv6_locs_node, NULL);
 	install_node(&srv6_loc_node, NULL);
+	install_node(&srv6_encap_node, NULL);
 
 	struct cmd_node *node;
 	for (unsigned int i = 0; i < vector_active(cmdvec); i++) {
@@ -4122,6 +4143,7 @@ void vtysh_init_vty(void)
 	install_element(SR_NODE, &srv6_cmd);
 	install_element(SR_NODE, &vtysh_end_all_cmd);
 	install_element(SRV6_NODE, &srv6_locators_cmd);
+	install_element(SRV6_NODE, &segment_routing_ipv6_encap_cmd);
 	install_element(SRV6_NODE, &exit_srv6_config_cmd);
 	install_element(SRV6_NODE, &vtysh_end_all_cmd);
 	install_element(SRV6_LOCS_NODE, &srv6_locators_locator_cmd);
@@ -4129,6 +4151,7 @@ void vtysh_init_vty(void)
 	install_element(SRV6_LOCS_NODE, &vtysh_end_all_cmd);
 	install_element(SRV6_LOC_NODE, &exit_srv6_loc_config_cmd);
 	install_element(SRV6_LOC_NODE, &vtysh_end_all_cmd);
+	install_element(SRV6_ENCAP_NODE, &exit_srv6_encap_config_cmd);
 
 	install_element(BGP_VRF_POLICY_NODE, &exit_vrf_policy_cmd);
 	install_element(BGP_VNC_DEFAULTS_NODE, &exit_vnc_config_cmd);
