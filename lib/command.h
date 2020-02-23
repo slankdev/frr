@@ -151,6 +151,7 @@ enum node_type {
 	SRV6_NODE,		 /* SRv6 node */
 	SRV6_LOCS_NODE,		 /* SRv6 locators node */
 	SRV6_LOC_NODE,		 /* SRv6 locator node */
+	SRV6_ENCAP_NODE,	 /* SRv6 encaps node */
 	PW_NODE,		 /* Pseudowire config node */
 	VTY_NODE,		 /* Vty node. */
 	LINK_PARAMS_NODE,	/* Link-parameters node */
