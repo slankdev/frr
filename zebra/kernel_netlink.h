@@ -42,6 +42,8 @@ extern int addattr16(struct nlmsghdr *n, unsigned int maxlen, int type,
 		     uint16_t data);
 extern int addattr32(struct nlmsghdr *n, unsigned int maxlen, int type,
 		     int data);
+extern int addattrstrz(struct nlmsghdr *n, int maxlen, int type,
+		    const char *str);
 extern struct rtattr *addattr_nest(struct nlmsghdr *n, int maxlen, int type);
 extern int addattr_nest_end(struct nlmsghdr *n, struct rtattr *nest);
 extern struct rtattr *rta_nest(struct rtattr *rta, int maxlen, int type);

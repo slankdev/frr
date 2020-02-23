@@ -55,6 +55,7 @@
 #include "zebra/zebra_pbr.h"
 #include "zebra/zebra_nhg.h"
 #include "zebra/interface.h"
+#include "zebra/ge_netlink.h"
 
 extern int allow_delete;
 
