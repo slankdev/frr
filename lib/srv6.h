@@ -21,10 +21,13 @@
 #define _FRR_SRV6_H
 
 #include <zebra.h>
+#include "prefix.h"
+
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
 #define SRV6_MAX_SIDS 16
+#define SRV6_LOCNAME_SIZE 256
 
 #ifdef __cplusplus
 extern "C" {
@@ -67,6 +70,32 @@ struct seg6local_context {
 	struct in_addr nh4;
 	struct in6_addr nh6;
 	uint32_t table;
+};
+
+struct srv6_locator {
+	char name[SRV6_LOCNAME_SIZE];
+	struct prefix_ipv6 prefix;
+	uint8_t function_bits_length;
+	int algonum;
+	uint64_t current;
+	struct list *functions;
+
+	QOBJ_FIELDS
+};
+DECLARE_QOBJ_TYPE(srv6_locator)
+
+struct srv6_function {
+	char locator_name[SRV6_LOCNAME_SIZE];
+	struct prefix_ipv6 prefix;
+	uint8_t owner_proto;
+	uint16_t owner_instance;
+	uint32_t request_key;
+
+	uint32_t ifindex;
+	uint32_t action;
+	struct seg6local_context ctx;
+
+	uint8_t explicit_allocate;
 };
 
 static inline const char *seg6_mode2str(enum seg6_mode_t mode)
@@ -125,6 +154,15 @@ const char *seg6local_context2str(char *str, size_t size,
 
 int snprintf_seg6_segs(char *str,
 		size_t size, const struct seg6_segs *segs);
+
+extern struct srv6_locator *srv6_locator_alloc(const char *name);
+extern void srv6_locator_free(struct srv6_locator *locator);
+extern struct srv6_function *
+srv6_function_alloc(const struct prefix_ipv6 *prefix);
+extern void srv6_function_free(struct srv6_function *function);
+extern void srv6_function_init(struct srv6_function *function,
+			       const char *locator_name,
+			       const struct prefix_ipv6 *prefix);
 
 #ifdef __cplusplus
 }
