@@ -105,6 +105,17 @@ def test_srv6():
     success, result = topotest.run_and_expect(test_func, None, count=10, wait=0.5)
     assert result is None, 'Failed _srv6_locator_default_sid in "{}"'.format(router)
 
+    def _srv6_manager(router):
+        output = json.loads(router.vtysh_cmd("show segment-routing srv6 manager json"))
+        expected = {
+            "tunSrc":"2001:db8::"
+        }
+        return topotest.json_cmp(output, expected)
+
+    test_func = functools.partial(_srv6_manager, router)
+    success, result = topotest.run_and_expect(test_func, None, count=10, wait=0.5)
+    assert result is None, 'Failed _srv6_manager in "{}"'.format(router)
+
 if __name__ == '__main__':
     args = ["-s"] + sys.argv[1:]
     sys.exit(pytest.main(args))
