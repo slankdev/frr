@@ -37,6 +37,7 @@
 #include "static_routes.h"
 #include "static_zebra.h"
 #include "static_debug.h"
+#include "static_srv6.h"
 
 char backup_config_file[256];
 
@@ -144,6 +145,7 @@ int main(int argc, char **argv, char **envp)
 	access_list_init();
 	static_debug_init();
 	static_vrf_init();
+	static_srv6_init();
 
 	static_zebra_init();
 	static_vty_init();
