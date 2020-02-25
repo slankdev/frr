@@ -58,6 +58,7 @@
 #include "zebra/zebra_nb.h"
 #include "zebra/zebra_opaque.h"
 #include "zebra/zebra_srte.h"
+#include "zebra/zebra_srv6.h"
 #include "zebra/zebra_srv6_vty.h"
 
 #define ZEBRA_PTM_SUPPORT
@@ -404,6 +405,7 @@ int main(int argc, char **argv)
 	zebra_pbr_init();
 	zebra_opaque_init();
 	zebra_srte_init();
+	zebra_srv6_init();
 	zebra_srv6_vty_init();
 
 	/* For debug purpose. */
