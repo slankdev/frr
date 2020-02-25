@@ -1474,7 +1474,72 @@ DEFUN_NOSH (show_debugging_static,
 	return CMD_SUCCESS;
 }
 
+static int static_sr_config(struct vty *vty)
+{
+	return 0;
+}
+
+DEFUN_NOSH (segment_routing,
+            segment_routing_cmd,
+            "segment-routing",
+            "Segment Routing\n")
+{
+	vty->node = SR_NODE;
+	return CMD_SUCCESS;
+}
+
+DEFUN_NOSH (segment_routing_srv6,
+            segment_routing_srv6_cmd,
+            "srv6",
+            "Segment Routing IPv6\n")
+{
+	vty->node = SRV6_NODE;
+	return CMD_SUCCESS;
+}
+
+DEFUN_NOSH (segment_routing_srv6_locators,
+            segment_routing_srv6_locators_cmd,
+            "locators",
+            "Segment Routing IPv6 locators\n")
+{
+	vty->node = SRV6_LOCS_NODE;
+	return CMD_SUCCESS;
+}
+
+DEFUN_NOSH (segment_routing_srv6_locators_locator,
+            segment_routing_srv6_locators_locator_cmd,
+            "locator WORD",
+            "Segment Routing IPv6 locator\n"
+            "Specify locator-name\n")
+{
+	vty->node = SRV6_LOC_NODE;
+	return CMD_SUCCESS;
+}
+
 static struct cmd_node debug_node = {DEBUG_NODE, "", 1};
+static struct cmd_node sr_node = {SR_NODE, "%s(config-sr)# ", 1};
+static struct cmd_node srv6_node = {SRV6_NODE, "%s(config-srv6)# ", 1};
+static struct cmd_node srv6_locs_node = {SRV6_LOCS_NODE, "%s(config-srv6-locators)# ", 1};
+static struct cmd_node srv6_loc_node = {SRV6_LOC_NODE, "%s(config-srv6-locator)# ", 1};
+
+static void static_srv6_vty_init(void)
+{
+	/* Install nodes and its default commands */
+	install_node(&sr_node, static_sr_config);
+	install_node(&srv6_node, NULL);
+	install_node(&srv6_locs_node, NULL);
+	install_node(&srv6_loc_node, NULL);
+	install_default(SR_NODE);
+	install_default(SRV6_NODE);
+	install_default(SRV6_LOCS_NODE);
+	install_default(SRV6_LOC_NODE);
+
+	/* Commands for change node */
+	install_element(CONFIG_NODE, &segment_routing_cmd);
+	install_element(SR_NODE, &segment_routing_srv6_cmd);
+	install_element(SRV6_NODE, &segment_routing_srv6_locators_cmd);
+	install_element(SRV6_LOCS_NODE, &segment_routing_srv6_locators_locator_cmd);
+}
 
 void static_vty_init(void)
 {
@@ -1495,6 +1560,8 @@ void static_vty_init(void)
 	install_element(VRF_NODE, &ipv6_route_address_interface_vrf_cmd);
 	install_element(CONFIG_NODE, &ipv6_route_cmd);
 	install_element(VRF_NODE, &ipv6_route_vrf_cmd);
+
+	static_srv6_vty_init();
 
 	install_element(VIEW_NODE, &show_debugging_static_cmd);
 	install_element(VIEW_NODE, &debug_staticd_cmd);
