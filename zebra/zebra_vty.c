@@ -37,6 +37,7 @@
 
 #include "zebra/zebra_router.h"
 #include "zebra/zserv.h"
+#include "zebra/zebra_srv6.h"
 #include "zebra/zebra_vrf.h"
 #include "zebra/zebra_mpls.h"
 #include "zebra/zebra_rnh.h"
@@ -531,6 +532,7 @@ static void vty_show_ip_route(struct vty *vty, struct route_node *rn,
 	json_object *json_nexthop = NULL;
 	json_object *json_route = NULL;
 	json_object *json_labels = NULL;
+	json_object *json_seg6local = NULL;
 	time_t uptime;
 	struct vrf *vrf = NULL;
 	rib_dest_t *dest = rib_dest_from_rnode(rn);
@@ -771,6 +773,17 @@ static void vty_show_ip_route(struct vty *vty, struct route_node *rn,
 				json_object_int_add(json_nexthop, "weight",
 						    nexthop->weight);
 
+			if (nexthop->nh_seg6local_ctx) {
+				json_seg6local = json_object_new_object();
+				json_object_string_add(
+					json_seg6local, "action",
+					seg6local_action2str(
+						nexthop->nh_seg6local_action));
+				json_object_object_add(json_nexthop,
+						       "seg6local",
+						       json_seg6local);
+			}
+
 			json_object_array_add(json_nexthops, json_nexthop);
 		}
 
@@ -810,6 +823,16 @@ static void vty_show_ip_route(struct vty *vty, struct route_node *rn,
 
 		if (nexthop->weight)
 			vty_out(vty, ", weight %u", nexthop->weight);
+
+		if (nexthop->nh_seg6local_ctx) {
+			seg6local_context2str(buf, sizeof(buf),
+					      nexthop->nh_seg6local_ctx,
+					      nexthop->nh_seg6local_action);
+			vty_out(vty, ", seg6local %s %s",
+				seg6local_action2str(
+					nexthop->nh_seg6local_action),
+				buf);
+		}
 
 		vty_out(vty, ", %s\n", up_str);
 
