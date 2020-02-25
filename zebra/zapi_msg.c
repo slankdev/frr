@@ -61,6 +61,7 @@
 #include "zebra/connected.h"
 #include "zebra/zebra_opaque.h"
 #include "zebra/zebra_srte.h"
+#include "zebra/zebra_srv6.h"
 
 /* Encoding helpers -------------------------------------------------------- */
 
@@ -1047,6 +1048,92 @@ static int zsend_table_manager_connect_response(struct zserv *client,
 	return zserv_send_message(client, s);
 }
 
+int zsend_bcast_zebra_srv6_locator_add(struct srv6_locator *locator)
+{
+	struct listnode *node;
+	struct zserv *client;
+
+	for (ALL_LIST_ELEMENTS_RO(zrouter.client_list, node, client))
+		zsend_zebra_srv6_locator_add(client, locator);
+	return 0;
+}
+
+int zsend_bcast_zebra_srv6_locator_delete(struct srv6_locator *locator)
+{
+	struct listnode *node;
+	struct zserv *client;
+
+	for (ALL_LIST_ELEMENTS_RO(zrouter.client_list, node, client))
+		zsend_zebra_srv6_locator_delete(client, locator);
+	return 0;
+}
+
+int zsend_bcast_zebra_srv6_function_add(struct srv6_function *function)
+{
+	struct listnode *node;
+	struct zserv *client;
+
+	for (ALL_LIST_ELEMENTS_RO(zrouter.client_list, node, client))
+		zsend_zebra_srv6_function_add(client, function);
+	return 0;
+}
+
+int zsend_bcast_zebra_srv6_function_delete(struct srv6_function *function)
+{
+	struct listnode *node;
+	struct zserv *client;
+
+	for (ALL_LIST_ELEMENTS_RO(zrouter.client_list, node, client))
+		zsend_zebra_srv6_function_delete(client, function);
+	return 0;
+}
+
+int zsend_zebra_srv6_locator_add(struct zserv *client,
+				 struct srv6_locator *locator)
+{
+	struct stream *s = stream_new(ZEBRA_MAX_PACKET_SIZ);
+
+	if (zapi_srv6_locator_encode(ZEBRA_SRV6_LOCATOR_ADD, s, locator) < 0) {
+		stream_free(s);
+		return -1;
+	}
+	zserv_send_message(client, s);
+	return 0;
+}
+
+int zsend_zebra_srv6_locator_delete(struct zserv *client,
+				    struct srv6_locator *locator)
+{
+	struct stream *s = stream_new(ZEBRA_MAX_PACKET_SIZ);
+
+	if (zapi_srv6_locator_encode(ZEBRA_SRV6_LOCATOR_DELETE, s, locator) < 0) {
+		stream_free(s);
+		return -1;
+	}
+	zserv_send_message(client, s);
+	return 0;
+}
+
+int zsend_zebra_srv6_function_add(struct zserv *client,
+				  struct srv6_function *function)
+{
+	struct stream *s = stream_new(ZEBRA_MAX_PACKET_SIZ);
+
+	zapi_srv6_function_encode(ZEBRA_SRV6_FUNCTION_ADD, s, function);
+	zserv_send_message(client, s);
+	return 0;
+}
+
+int zsend_zebra_srv6_function_delete(struct zserv *client,
+				     struct srv6_function *function)
+{
+	struct stream *s = stream_new(ZEBRA_MAX_PACKET_SIZ);
+
+	zapi_srv6_function_encode(ZEBRA_SRV6_FUNCTION_DELETE, s, function);
+	zserv_send_message(client, s);
+	return 0;
+}
+
 /* Inbound message handling ------------------------------------------------ */
 
 const int cmd2type[] = {
@@ -1782,6 +1869,21 @@ static void zread_route_add(ZAPI_HANDLER_ARGS)
 			bnhg->nhe->nhg.nexthop = nexthop;
 
 		last_nh = nexthop;
+
+		if (CHECK_FLAG(api.flags, ZEBRA_FLAG_SEG6LOCAL_ROUTE)
+		    && api_nh->type != NEXTHOP_TYPE_BLACKHOLE) {
+			if (IS_ZEBRA_DEBUG_RECV)
+				zlog_debug("%s: adding seg6local action %s",
+					   __func__,
+					   seg6local_action2str(
+						   api_nh->seg6local_action));
+
+			nexthop_add_seg6local(nexthop, api_nh->seg6local_action,
+					      &api_nh->seg6local_ctx);
+		}
+
+		/* Add new nexthop to temporary list */
+		nexthop_group_add_sorted(ng, nexthop);
 	}
 
 	if (CHECK_FLAG(api.message, ZAPI_MESSAGE_DISTANCE))
@@ -2025,6 +2127,7 @@ static void zread_hello(ZAPI_HANDLER_ARGS)
 	if (!client->synchronous) {
 		zsend_capabilities(client, zvrf);
 		zebra_vrf_update_all(client);
+		zebra_srv6_locator_update_all(client);
 	}
 stream_failure:
 	return;
@@ -3100,6 +3203,8 @@ void (*const zserv_handlers[])(ZAPI_HANDLER_ARGS) = {
 	[ZEBRA_MLAG_CLIENT_REGISTER] = zebra_mlag_client_register,
 	[ZEBRA_MLAG_CLIENT_UNREGISTER] = zebra_mlag_client_unregister,
 	[ZEBRA_MLAG_FORWARD_MSG] = zebra_mlag_forward_client_msg,
+	[ZEBRA_SRV6_FUNCTION_ADD] = zrecv_zebra_srv6_function_add,
+	[ZEBRA_SRV6_FUNCTION_DELETE] = zrecv_zebra_srv6_function_delete,
 	[ZEBRA_CLIENT_CAPABILITIES] = zread_client_capabilities,
 	[ZEBRA_NEIGH_DISCOVER] = zread_neigh_discover};
 
