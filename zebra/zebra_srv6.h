@@ -31,6 +31,7 @@
 
 /* SRv6 instance structure. */
 struct zebra_srv6 {
+	struct in6_addr encap_src;
 	struct list *locators;
 };
 
