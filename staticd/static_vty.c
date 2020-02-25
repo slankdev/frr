@@ -1537,6 +1537,36 @@ DEFPY(function_locator,
 	return CMD_SUCCESS;
 }
 
+DEFUN (show_srv6_debug,
+       show_srv6_debug_cmd,
+       "show srv6 debug",
+       SHOW_STR
+       "SRv6\n"
+       DEBUG_STR)
+{
+	struct srv6_locator *locator;
+	struct srv6_function *function;
+	struct listnode *nodel, *nodef;
+	char strl[256], strf[256];
+	struct list *srv6_locators = static_srv6_locators();
+
+	vty_out(vty, "Function:\n");
+	vty_out(vty, "Locator Name         Prefix                   Ownter\n");
+	vty_out(vty, "-------------------- ------------------------ ---------------\n");
+	for (ALL_LIST_ELEMENTS_RO(srv6_locators, nodel, locator)) {
+		prefix2str(&locator->prefix, strl, sizeof(strl));
+		for (ALL_LIST_ELEMENTS_RO(locator->functions, nodef,
+					  function)) {
+			prefix2str(&function->prefix, strf, sizeof(strf));
+			vty_out(vty, "%-20s %-24s %-15s\n",
+				locator->name, strf,
+				zebra_route_string(function->owner_proto));
+		}
+	}
+	vty_out(vty, "\n");
+	return CMD_SUCCESS;
+}
+
 static int static_sr_config(struct vty *vty)
 {
 	return 0;
@@ -1632,6 +1662,7 @@ static void static_srv6_vty_init(void)
 
 	/* Commands for configuration */
 	install_element(SRV6_LOC_NODE, &function_locator_cmd);
+	install_element(VIEW_NODE, &show_srv6_debug_cmd);
 }
 
 void static_vty_init(void)
