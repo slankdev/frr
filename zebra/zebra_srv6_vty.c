@@ -284,6 +284,11 @@ static int zebra_sr_config(struct vty *vty)
 	if (zebra_srv6_is_enable()) {
 		vty_out(vty, "segment-routing\n");
 		vty_out(vty, " srv6\n");
+		inet_ntop(AF_INET6, &srv6->encap_src, str, sizeof(str));
+		vty_out(vty, "  encapsulation\n");
+		vty_out(vty, "   source-address %s\n", str);
+		vty_out(vty, "  !\n");
+
 		vty_out(vty, "  locators\n");
 		for (ALL_LIST_ELEMENTS_RO(srv6->locators, node, locator)) {
 			inet_ntop(AF_INET6, &locator->prefix.prefix,
