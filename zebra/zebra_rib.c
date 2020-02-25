@@ -2470,6 +2470,10 @@ void _route_entry_dump(const char *func, union prefixconstptr pp,
 			   (CHECK_FLAG(nexthop->flags, NEXTHOP_FLAG_DUPLICATE)
 				    ? "DUPLICATE "
 				    : ""));
+		zlog_debug("%s: %s %s[%u] seg6local_action == %u",
+			   straddr, (nexthop->rparent ? "  NH" : "NH"),
+				 nhname, nexthop->ifindex,
+				 nexthop->nh_seg6local_action);
 	}
 	zlog_debug("%s: dump complete", straddr);
 }

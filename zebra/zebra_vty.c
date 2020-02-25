@@ -37,6 +37,7 @@
 
 #include "zebra/zebra_router.h"
 #include "zebra/zserv.h"
+#include "zebra/zebra_srv6.h"
 #include "zebra/zebra_vrf.h"
 #include "zebra/zebra_mpls.h"
 #include "zebra/zebra_rnh.h"
@@ -646,6 +647,10 @@ static void vty_show_ip_route(struct vty *vty, struct route_node *rn,
 						       json_labels);
 			}
 
+			if (nexthop->nh_seg6local_ctx) {
+				//TODO(slankdev): implement
+			}
+
 			json_object_array_add(json_nexthops, json_nexthop);
 		}
 
@@ -772,6 +777,15 @@ static void vty_show_ip_route(struct vty *vty, struct route_node *rn,
 				mpls_label2str(nexthop->nh_label->num_labels,
 					       nexthop->nh_label->label, buf,
 					       sizeof buf, 1));
+		}
+
+		if (nexthop->nh_seg6local_ctx) {
+			seg6local_context2str(buf, sizeof(buf),
+				nexthop->nh_seg6local_ctx,
+				nexthop->nh_seg6local_action);
+			vty_out(vty, ", seg6local %s %s",
+				seg6local_action2str(
+					nexthop->nh_seg6local_action), buf);
 		}
 
 		if (uptime < ONE_DAY_SECOND)

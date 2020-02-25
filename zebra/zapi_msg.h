@@ -30,6 +30,7 @@
 #include "zebra/zebra_pbr.h"
 #include "zebra/zebra_errors.h"
 #include "zebra/label_manager.h"
+#include "zebra/zebra_srv6.h"
 
 
 #ifdef __cplusplus
@@ -100,6 +101,19 @@ extern int zsend_assign_label_chunk_response(struct zserv *client,
 extern int zsend_label_manager_connect_response(struct zserv *client,
 						vrf_id_t vrf_id,
 						unsigned short result);
+
+extern int zsend_bcast_zebra_srv6_locator_add(struct srv6_locator *loc);
+extern int zsend_bcast_zebra_srv6_locator_delete(struct srv6_locator *loc);
+extern int zsend_bcast_zebra_srv6_function_add(struct srv6_function *fun);
+extern int zsend_bcast_zebra_srv6_function_delete(struct srv6_function *fun);
+extern int zsend_zebra_srv6_locator_add(struct zserv *client,
+					struct srv6_locator *loc);
+extern int zsend_zebra_srv6_locator_delete(struct zserv *client,
+					   struct srv6_locator *loc);
+extern int zsend_zebra_srv6_function_add(struct zserv *client,
+					 struct srv6_function *fun);
+extern int zsend_zebra_srv6_function_delete(struct zserv *client,
+					    struct srv6_function *fun);
 
 
 #ifdef __cplusplus

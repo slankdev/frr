@@ -25,6 +25,8 @@
 #include <net/if_arp.h>
 #include <linux/lwtunnel.h>
 #include <linux/mpls_iptunnel.h>
+#include <linux/seg6_iptunnel.h>
+#include <linux/seg6_local.h>
 #include <linux/neighbour.h>
 #include <linux/rtnetlink.h>
 #include <linux/nexthop.h>
@@ -38,6 +40,8 @@
 #include "if.h"
 #include "log.h"
 #include "prefix.h"
+#include "plist.h"
+#include "plist_int.h"
 #include "connected.h"
 #include "table.h"
 #include "memory.h"
@@ -68,6 +72,7 @@
 #include "zebra/zebra_mroute.h"
 #include "zebra/zebra_vxlan.h"
 #include "zebra/zebra_errors.h"
+#include "zebra/zebra_srv6.h"
 
 #ifndef AF_MPLS
 #define AF_MPLS 28
@@ -1152,6 +1157,44 @@ static void _netlink_route_build_singlepath(const char *routedesc, int bytelen,
 		}
 	}
 
+	if (nexthop->nh_seg6local_ctx) {
+		uint32_t action;
+		uint16_t encap;
+		struct rtattr *nest;
+		const struct seg6local_context *ctx;
+
+		ctx = nexthop->nh_seg6local_ctx;
+		action = nexthop->nh_seg6local_action;
+		encap = LWTUNNEL_ENCAP_SEG6_LOCAL;
+		addattr_l(nlmsg, req_size, RTA_ENCAP_TYPE, &encap,
+			  sizeof(uint16_t));
+
+		nest = addattr_nest(nlmsg, req_size, RTA_ENCAP);
+		switch (nexthop->nh_seg6local_action) {
+		case ZEBRA_SEG6_LOCAL_ACTION_END:
+			addattr32(nlmsg, req_size, SEG6_LOCAL_ACTION,
+				  SEG6_LOCAL_ACTION_END);
+			break;
+		case ZEBRA_SEG6_LOCAL_ACTION_END_X:
+			addattr32(nlmsg, req_size, SEG6_LOCAL_ACTION,
+				  SEG6_LOCAL_ACTION_END_X);
+			addattr_l(nlmsg, req_size, SEG6_LOCAL_NH6,
+				  &ctx->nh6, sizeof(struct in6_addr));
+			break;
+		case ZEBRA_SEG6_LOCAL_ACTION_END_DX4:
+			addattr32(nlmsg, req_size, SEG6_LOCAL_ACTION,
+				  SEG6_LOCAL_ACTION_END_DX4);
+			addattr_l(nlmsg, req_size, SEG6_LOCAL_NH4,
+				  &ctx->nh4, sizeof(struct in_addr));
+			break;
+		default:
+			zlog_err("%s: unsupport seg6local behaviour action=%u",
+				 __func__, action);
+			break;
+		}
+		addattr_nest_end(nlmsg, nest);
+	}
+
 	if (CHECK_FLAG(nexthop->flags, NEXTHOP_FLAG_ONLINK))
 		rtmsg->rtm_flags |= RTNH_F_ONLINK;
 
@@ -2070,6 +2113,51 @@ static int netlink_nexthop(int cmd, struct zebra_dplane_ctx *ctx)
 							  * sizeof(mpls_lse_t));
 					addattr_nest_end(&req.n, nest);
 				}
+			}
+
+			if (nh->nh_seg6local_ctx) {
+				uint32_t action;
+				uint16_t encap;
+				struct rtattr *nest;
+				const struct seg6local_context *ctx;
+
+				req.nhm.nh_family = AF_INET6;
+				action = nh->nh_seg6local_action;
+				ctx = nh->nh_seg6local_ctx;
+				encap = LWTUNNEL_ENCAP_SEG6_LOCAL;
+				addattr_l(&req.n, req_size, NHA_ENCAP_TYPE,
+					  &encap, sizeof(uint16_t));
+
+				nest = addattr_nest(&req.n, req_size,
+						    NHA_ENCAP | NLA_F_NESTED);
+				switch (action) {
+				case SEG6_LOCAL_ACTION_END:
+					addattr32(&req.n, req_size,
+						  SEG6_LOCAL_ACTION,
+						  SEG6_LOCAL_ACTION_END);
+					break;
+				case SEG6_LOCAL_ACTION_END_X:
+					addattr32(&req.n, req_size,
+						  SEG6_LOCAL_ACTION,
+						  SEG6_LOCAL_ACTION_END_X);
+					addattr_l(&req.n, req_size,
+						  SEG6_LOCAL_NH6, &ctx->nh6,
+						  sizeof(struct in6_addr));
+					break;
+				case SEG6_LOCAL_ACTION_END_DX4:
+					addattr32(&req.n, req_size,
+						  SEG6_LOCAL_ACTION,
+						  SEG6_LOCAL_ACTION_END_DX4);
+					addattr_l(&req.n, req_size,
+						  SEG6_LOCAL_NH4, &ctx->nh4,
+						  sizeof(struct in_addr));
+					break;
+				default:
+					zlog_err("%s: unsupport seg6local behaviour action=%u",
+						 __func__, action);
+					break;
+				}
+				addattr_nest_end(&req.n, nest);
 			}
 
 		nexthop_done:
