@@ -164,6 +164,13 @@ extern void srv6_function_init(struct srv6_function *function,
 		const char *locator_name,
 		const struct prefix_ipv6 *prefix);
 
+extern const char *srv6_function2str(
+		const struct srv6_function *function,
+		char *str, size_t size);
+extern const char *srv6_locator2str(
+		const struct srv6_function *function,
+		char *str, size_t size);
+
 #ifdef __cplusplus
 }
 #endif

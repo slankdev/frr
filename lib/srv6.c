@@ -174,3 +174,29 @@ void srv6_function_free(struct srv6_function *function)
 {
 	XFREE(MTYPE_SRV6_FUNCTION, function);
 }
+
+const char *srv6_function2str(
+		const struct srv6_function *function,
+		char *str, size_t size)
+{
+	char buf[128], buf2[128];
+
+	prefix2str(&function->prefix, buf, sizeof(buf));
+	snprintf(str, size, "%s locator=%s own=%s action=%s(%s) ifindex=%u %s",
+		 buf, function->locator_name,
+		 zebra_route_string(function->owner_proto),
+		 seg6local_action2str(function->action),
+		 seg6local_context2str(buf2, sizeof(buf2),
+			(struct seg6local_context *)&function->ctx,
+			function->action),
+		 function->ifindex,
+		 function->explicit_allocate?"explicit-alloc":"auto-alloc");
+	return str;
+}
+
+const char *srv6_locator2str(
+		const struct srv6_function *function,
+		char *str, size_t size)
+{
+	return "";
+}
