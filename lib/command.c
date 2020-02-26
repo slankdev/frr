@@ -138,6 +138,10 @@ const char *const node_names[] = {
 	"forwarding",		    // FORWARDING_NODE,
 	"protocol",		    // PROTOCOL_NODE,
 	"mpls",			    // MPLS_NODE,
+	"sr",			    // SR_NODE,
+	"srv6",			    // SRV6_NODE,
+	"srv6-locators",	    // SRV6_LOCS_NODE,
+	"srv6-locator",		    // SRV6_LOC_NODE,
 	"pw",			    // PW_NODE,
 	"vty",			    // VTY_NODE,
 	"link-params",		    // LINK_PARAMS_NODE,
@@ -1004,6 +1008,15 @@ enum node_type node_parent(enum node_type node)
 		break;
 	case BFD_PEER_NODE:
 		ret = BFD_NODE;
+		break;
+	case SRV6_NODE:
+		ret = SR_NODE;
+		break;
+	case SRV6_LOCS_NODE:
+		ret = SRV6_NODE;
+		break;
+	case SRV6_LOC_NODE:
+		ret = SRV6_LOCS_NODE;
 		break;
 	default:
 		ret = CONFIG_NODE;
