@@ -138,8 +138,8 @@ static void get_function_addr(struct in6_addr *locator,
 
 static int zebra_srv6_cleanup(struct zserv *client)
 {
-	struct srv6 *srv6 = srv6_get_default();
-	if (!srv6 || !srv6->is_enable || !srv6->vrf_ip.plist)
+	struct zebra_srv6 *srv6 = zebra_srv6_get_default();
+	if (zebra_srv6_is_enable())
 		return 0;
 
 	for (struct route_node *rn = route_top(srv6->vrf_ip.table);
