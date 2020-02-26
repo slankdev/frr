@@ -57,6 +57,10 @@ static struct cmd_node srv6_loc_node = {
 	SRV6_LOC_NODE, "%s(config-srv6-locator)# ", 1
 };
 
+static struct cmd_node srv6_encap_node = {
+	SRV6_ENCAP_NODE, "%s(config-srv6-encap)# ", 1
+};
+
 DEFUN (show_srv6_sid,
        show_srv6_sid_cmd,
        "show segment-routing srv6 sid [json]",
@@ -214,7 +218,7 @@ DEFUN (show_segment_routing_srv6_manager,
 		vty_out(vty, "\n");
 
 	char str[256];
-	struct srv6 *srv6 = srv6_get_default();
+	struct zebra_srv6 *srv6 = zebra_srv6_get_default();
 	inet_ntop(AF_INET6, &srv6->encap_src, str, sizeof(str));
 
 	if (uj) {
@@ -337,8 +341,7 @@ DEFUN (encapsulation_source_address,
 
 	dplane_srtunsrc_update(&cp.prefix);
 
-	struct srv6 *srv6 = srv6_get_default();
-	srv6->is_enable = true;
+	struct zebra_srv6 *srv6 = zebra_srv6_get_default();
 	memcpy(&srv6->encap_src, &cp.prefix, sizeof(struct in6_addr));
 	return CMD_SUCCESS;
 }
@@ -355,7 +358,7 @@ DEFUN (pseudo_dt4_dummy_ip,
 	if (argv_find(argv, argc, "no", &idx))
 		negate = true;
 
-	struct srv6 *srv6 = srv6_get_default();
+	struct zebra_srv6 *srv6 = zebra_srv6_get_default();
 	if (negate) {
 		vty_out(vty, "this command doesn't supported\n");
 		return CMD_WARNING_CONFIG_FAILED;
