@@ -1198,8 +1198,8 @@ vrf_ip_route_del(struct prefix *prefix, uint32_t table_id)
 static uint32_t
 get_pseudo_dt4_vrf_ip(uint32_t table_id)
 {
-	struct srv6 *srv6 = srv6_get_default();
-	if (!srv6 || !srv6->is_enable || !srv6->vrf_ip.plist)
+	struct zebra_srv6 *srv6 = zebra_srv6_get_default();
+	if (!zebra_srv6_is_enable())
 		return 0;
 
 	for (struct prefix_list_entry *pentry = srv6->vrf_ip.plist->head;
@@ -1244,8 +1244,8 @@ get_pseudo_dt4_vrf_ip(uint32_t table_id)
 static void
 free_pseudo_dt4_vrf_ip(uint32_t table_id)
 {
-	struct srv6 *srv6 = srv6_get_default();
-	if (!srv6 || !srv6->is_enable || !srv6->vrf_ip.plist)
+	struct zebra_srv6 *srv6 = zebra_srv6_get_default();
+	if (!zebra_srv6_is_enable())
 		return;
 
 	for (struct route_node *rn = route_top(srv6->vrf_ip.table);
