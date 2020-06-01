@@ -37,6 +37,7 @@
 #include "pw.h"
 
 #include "mlag.h"
+#include "srv6.h"
 
 /* Zebra types. Used in Zserv message header. */
 typedef uint16_t zebra_size_t;
@@ -195,6 +196,10 @@ typedef enum {
 	ZEBRA_MLAG_CLIENT_REGISTER,
 	ZEBRA_MLAG_CLIENT_UNREGISTER,
 	ZEBRA_MLAG_FORWARD_MSG,
+	ZEBRA_SRV6_LOCATOR_ADD,
+	ZEBRA_SRV6_LOCATOR_DELETE,
+	ZEBRA_SRV6_FUNCTION_ADD,
+	ZEBRA_SRV6_FUNCTION_DELETE,
 	ZEBRA_ERROR,
 	ZEBRA_CLIENT_CAPABILITIES
 } zebra_message_types_t;
@@ -328,6 +333,10 @@ struct zclient {
 	int (*mlag_process_up)(void);
 	int (*mlag_process_down)(void);
 	int (*mlag_handle_msg)(struct stream *msg, int len);
+	int (*srv6_locator_add)(ZAPI_CALLBACK_ARGS);
+	int (*srv6_locator_delete)(ZAPI_CALLBACK_ARGS);
+	int (*srv6_function_add)(ZAPI_CALLBACK_ARGS);
+	int (*srv6_function_delete)(ZAPI_CALLBACK_ARGS);
 	int (*handle_error)(enum zebra_error_types error);
 };
 
@@ -370,6 +379,14 @@ struct zapi_nexthop {
 	/* MPLS labels for BGP-LU or Segment Routing */
 	uint8_t label_num;
 	mpls_label_t labels[MPLS_MAX_LABELS];
+
+	/* SRv6 segs for Transit-behaviour */
+	uint8_t seg6_segs_num;
+	struct in6_addr seg6_segs[SRV6_MAX_SIDS];
+
+	/* SRv6 localsid info for Endpoint-behaviour */
+	uint32_t seg6local_action;
+	struct seg6local_context seg6local_ctx;
 
 	struct ethaddr rmac;
 
@@ -430,6 +447,16 @@ struct zapi_route {
  * route entry.  This mainly is used for backup static routes.
  */
 #define ZEBRA_FLAG_RR_USE_DISTANCE    0x40
+/*
+ * This flag tells Zebra that the route is a seg6 route and should
+ * be treated specially.
+ */
+#define ZEBRA_FLAG_SEG6_ROUTE         0x80
+/*
+ * This flag tells Zebra that the route is a seg6local route and
+ * should be treated specially.
+ */
+#define ZEBRA_FLAG_SEG6LOCAL_ROUTE   0x100
 
 	uint8_t message;
 
@@ -754,6 +781,17 @@ bool zapi_rule_notify_decode(struct stream *s, uint32_t *seqno,
 bool zapi_ipset_notify_decode(struct stream *s,
 			      uint32_t *unique,
 			     enum zapi_ipset_notify_owner *note);
+
+extern int zapi_srv6_locator_encode(uint8_t cmd, struct stream *s,
+				    const struct srv6_locator *locator);
+extern int zapi_srv6_locator_decode(struct stream *s,
+				    struct srv6_locator *locator);
+extern int zapi_srv6_function_encode(uint8_t cmd, struct stream *s,
+				     const struct srv6_function *function);
+extern int zapi_srv6_function_decode(struct stream *s,
+				     struct srv6_function *function);
+extern int zclient_send_srv6_function(struct zclient *zclient,
+				      const struct srv6_function *function);
 
 #define ZEBRA_IPSET_NAME_SIZE   32
 

@@ -1205,6 +1205,28 @@ static struct cmd_node nh_group_node = {
 	"%s(config-nh-group)# ",
 };
 
+static struct cmd_node sr_node = {
+	SR_NODE, "%s(config-sr)# ",
+};
+
+static struct cmd_node srv6_node = {
+	SRV6_NODE, "%s(config-srv6)# ",
+};
+
+static struct cmd_node srv6_locs_node = {
+	SRV6_LOCS_NODE, "%s(config-srv6-locators)# ",
+};
+
+static struct cmd_node srv6_loc_node = {
+	SRV6_LOC_NODE, "%s(config-srv6-locator)# ",
+};
+
+static struct cmd_node srv6_encap_node = {
+	SRV6_ENCAP_NODE, "%s(config-srv6-encap)# ",
+};
+
+static struct cmd_node bgp_srv6_node = { BGP_SRV6_NODE, "%s(config-router-srv6)# ", };
+
 static struct cmd_node rmap_node = {RMAP_NODE, "%s(config-route-map)# "};
 
 static struct cmd_node pbr_map_node = {PBRMAP_NODE, "%s(config-pbr-map)# "};
@@ -1333,6 +1355,47 @@ DEFUNSH(VTYSH_REALLYALL, vtysh_end_all, vtysh_end_all_cmd, "end",
 	"End current mode and change to enable mode\n")
 {
 	return vtysh_end();
+}
+
+DEFUNSH(VTYSH_SR, segment_routing, segment_routing_cmd,
+	"segment-routing",
+	"Segment-Routing configration\n")
+{
+	vty->node = SR_NODE;
+	return CMD_SUCCESS;
+}
+
+DEFUNSH(VTYSH_SR, srv6, srv6_cmd,
+	"srv6",
+	"Segment-Routing SRv6 configration\n")
+{
+	vty->node = SRV6_NODE;
+	return CMD_SUCCESS;
+}
+
+DEFUNSH(VTYSH_SR, srv6_locators, srv6_locators_cmd,
+	"locators",
+	"Segment-Routing SRv6 locators configration\n")
+{
+	vty->node = SRV6_LOCS_NODE;
+	return CMD_SUCCESS;
+}
+
+DEFUNSH(VTYSH_SR, srv6_locators_locator, srv6_locators_locator_cmd,
+	"locator WORD",
+	"Segment Routing SRv6 locator\n"
+	"Specify locator-name\n")
+{
+	vty->node = SRV6_LOC_NODE;
+	return CMD_SUCCESS;
+}
+
+DEFUNSH(VTYSH_ZEBRA, segment_routing_ipv6_encap, segment_routing_ipv6_encap_cmd,
+	"encapsulation",
+	"Segment-Routing SRv6 encap configration\n")
+{
+	vty->node = SRV6_ENCAP_NODE;
+	return CMD_SUCCESS;
 }
 
 DEFUNSH(VTYSH_BGPD, router_bgp, router_bgp_cmd,
@@ -1837,6 +1900,7 @@ static int vtysh_exit(struct vty *vty)
 	case KEYCHAIN_NODE:
 	case BFD_NODE:
 	case RPKI_NODE:
+	case SR_NODE:
 		vtysh_execute("end");
 		vtysh_execute("configure");
 		vty->node = CONFIG_NODE;
@@ -1883,6 +1947,15 @@ static int vtysh_exit(struct vty *vty)
 		break;
 	case BFD_PEER_NODE:
 		vty->node = BFD_NODE;
+		break;
+	case SRV6_NODE:
+		vty->node = SR_NODE;
+		break;
+	case SRV6_LOCS_NODE:
+		vty->node = SRV6_NODE;
+		break;
+	case SRV6_LOC_NODE:
+		vty->node = SRV6_LOCS_NODE;
 		break;
 	default:
 		break;
@@ -1967,6 +2040,69 @@ DEFUNSH(VTYSH_VRF, exit_vrf_config, exit_vrf_config_cmd, "exit-vrf",
 		vty->node = CONFIG_NODE;
 	return CMD_SUCCESS;
 }
+
+DEFUNSH(VTYSH_SR, exit_sr_config, exit_sr_config_cmd, "exit",
+	"Exit from SR configuration mode\n")
+{
+	if (vty->node == SR_NODE)
+		vty->node = CONFIG_NODE;
+	return CMD_SUCCESS;
+}
+
+DEFUNSH(VTYSH_SR, exit_srv6_config, exit_srv6_config_cmd, "exit",
+	"Exit from SRv6 configuration mode\n")
+{
+	if (vty->node == SRV6_NODE)
+		vty->node = SR_NODE;
+	return CMD_SUCCESS;
+}
+
+DEFUNSH(VTYSH_SR, exit_srv6_locs_config, exit_srv6_locs_config_cmd, "exit",
+	"Exit from SRv6-locator configuration mode\n")
+{
+	if (vty->node == SRV6_LOCS_NODE)
+		vty->node = SRV6_NODE;
+	return CMD_SUCCESS;
+}
+
+DEFUNSH(VTYSH_SR, exit_srv6_loc_config, exit_srv6_loc_config_cmd, "exit",
+	"Exit from SRv6-locators configuration mode\n")
+{
+	if (vty->node == SRV6_LOC_NODE)
+		vty->node = SRV6_LOCS_NODE;
+	return CMD_SUCCESS;
+}
+
+DEFUNSH(VTYSH_ZEBRA, exit_srv6_encap_config, exit_srv6_encap_config_cmd, "exit",
+	"Exit from SRv6-encap configuration mode\n")
+{
+	if (vty->node == SRV6_ENCAP_NODE)
+		vty->node = SRV6_NODE;
+	return CMD_SUCCESS;
+}
+
+DEFUNSH(VTYSH_BGPD,
+        bgp_segment_routing_srv6,
+        bgp_segment_routing_srv6_cmd,
+        "segment-routing srv6",
+        "Segment-Routing configuration\n"
+        "Segment-Routing SRv6 configuration\n")
+{
+	vty->node = BGP_SRV6_NODE;
+	return CMD_SUCCESS;
+}
+
+DEFUNSH(VTYSH_BGPD,
+        exit_bgp_segment_routing_srv6,
+        exit_bgp_segment_routing_srv6_cmd,
+        "exit",
+        "exit Segment-Routing SRv6 configuration\n")
+{
+	if (vty->node == BGP_SRV6_NODE)
+		vty->node = BGP_NODE;
+	return CMD_SUCCESS;
+}
+
 
 DEFUNSH(VTYSH_BGPD, exit_vrf_policy, exit_vrf_policy_cmd, "exit-vrf-policy",
 	"Exit from VRF policy configuration mode\n")
@@ -3778,6 +3914,12 @@ void vtysh_init_vty(void)
 	install_node(&bfd_node, NULL);
 	install_node(&bfd_peer_node, NULL);
 #endif /* HAVE_BFDD */
+	install_node(&sr_node, NULL);
+	install_node(&srv6_node, NULL);
+	install_node(&srv6_locs_node, NULL);
+	install_node(&srv6_loc_node, NULL);
+	install_node(&srv6_encap_node, NULL);
+	install_node(&bgp_srv6_node, NULL);
 
 	struct cmd_node *node;
 	for (unsigned int i = 0; i < vector_active(cmdvec); i++) {
@@ -4020,6 +4162,26 @@ void vtysh_init_vty(void)
 	/* EVPN commands */
 	install_element(BGP_EVPN_NODE, &bgp_evpn_vni_cmd);
 	install_element(BGP_EVPN_VNI_NODE, &exit_vni_cmd);
+
+	/* SRv6 Data-plane */
+	install_element(CONFIG_NODE, &segment_routing_cmd);
+	install_element(SR_NODE, &exit_sr_config_cmd);
+	install_element(SR_NODE, &srv6_cmd);
+	install_element(SR_NODE, &vtysh_end_all_cmd);
+	install_element(SRV6_NODE, &srv6_locators_cmd);
+	install_element(SRV6_NODE, &segment_routing_ipv6_encap_cmd);
+	install_element(SRV6_NODE, &exit_srv6_config_cmd);
+	install_element(SRV6_NODE, &vtysh_end_all_cmd);
+	install_element(SRV6_LOCS_NODE, &srv6_locators_locator_cmd);
+	install_element(SRV6_LOCS_NODE, &exit_srv6_locs_config_cmd);
+	install_element(SRV6_LOCS_NODE, &vtysh_end_all_cmd);
+	install_element(SRV6_LOC_NODE, &exit_srv6_loc_config_cmd);
+	install_element(SRV6_LOC_NODE, &vtysh_end_all_cmd);
+	install_element(SRV6_ENCAP_NODE, &exit_srv6_encap_config_cmd);
+
+	/* SRv6 BGP Control-plane */
+	install_element(BGP_NODE, &bgp_segment_routing_srv6_cmd);
+	install_element(BGP_SRV6_NODE, &exit_bgp_segment_routing_srv6_cmd);
 
 	install_element(BGP_VRF_POLICY_NODE, &exit_vrf_policy_cmd);
 	install_element(BGP_VNC_DEFAULTS_NODE, &exit_vnc_config_cmd);

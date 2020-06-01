@@ -711,6 +711,7 @@ static void nhg_ctx_free(struct nhg_ctx **ctx)
 	nh = nhg_ctx_get_nh(*ctx);
 
 	nexthop_del_labels(nh);
+	nexthop_del_seg6local(nh);
 
 done:
 	XFREE(MTYPE_NHG_CTX, *ctx);
@@ -1110,6 +1111,7 @@ static struct nhg_hash_entry *depends_find_singleton(const struct nexthop *nh,
 
 	/* The copy may have allocated labels; free them if necessary. */
 	nexthop_del_labels(&lookup);
+	nexthop_del_seg6local(&lookup);
 
 	return nhe;
 }
@@ -1584,6 +1586,14 @@ static int nexthop_active(afi_t afi, struct route_entry *re,
 					"\t%s: Static route unable to resolve",
 					__PRETTY_FUNCTION__);
 			return resolved;
+		} else if (CHECK_FLAG(re->flags, ZEBRA_FLAG_SEG6LOCAL_ROUTE)) {
+			if (IS_ZEBRA_DEBUG_RIB_DETAILED) {
+				zlog_debug(
+					"\t%s: Route Type %s is SEG6LOCAL route",
+					__PRETTY_FUNCTION__,
+					zebra_route_string(re->type));
+			}
+			return 1;
 		} else {
 			if (IS_ZEBRA_DEBUG_RIB_DETAILED) {
 				zlog_debug(
@@ -2010,6 +2020,8 @@ void zebra_nhg_dplane_result(struct zebra_dplane_ctx *ctx)
 	case DPLANE_OP_NEIGH_DELETE:
 	case DPLANE_OP_VTEP_ADD:
 	case DPLANE_OP_VTEP_DELETE:
+	case DPLANE_OP_SRTUNSRC_UPDATE:
+	case DPLANE_OP_SRTUNSRC_DELETE:
 	case DPLANE_OP_NONE:
 		break;
 	}

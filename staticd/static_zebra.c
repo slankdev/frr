@@ -42,6 +42,7 @@
 #include "static_zebra.h"
 #include "static_nht.h"
 #include "static_vty.h"
+#include "static_srv6.h"
 
 bool debug;
 
@@ -213,6 +214,192 @@ static int static_zebra_nexthop_update(ZAPI_CALLBACK_ARGS)
 		zlog_err("No nhtd?");
 
 	return 1;
+}
+
+static int zrecv_static_srv6_locator_add(ZAPI_CALLBACK_ARGS)
+{
+	struct srv6_locator api;
+	struct srv6_locator *locator;
+	char str[256];
+	zapi_srv6_locator_decode(zclient->ibuf, &api);
+	inet_ntop(AF_INET6, &api.prefix.prefix, str, sizeof(str));
+	locator = srv6_locator_alloc(api.name);
+	if (!locator) {
+		zlog_err("zrecv_static_srv6_locator_add: alloc failed");
+		return 1;
+	}
+	locator->prefix = api.prefix;
+	locator->function_bits_length = api.function_bits_length;
+	static_srv6_locator_add(locator);
+	return 0;
+}
+
+static int zrecv_static_srv6_locator_delete(ZAPI_CALLBACK_ARGS)
+{
+	struct srv6_locator api;
+	struct srv6_locator *locator;
+	char str[256];
+	zapi_srv6_locator_decode(zclient->ibuf, &api);
+	inet_ntop(AF_INET6, &api.prefix.prefix, str, sizeof(str));
+	locator = static_srv6_locator_lookup(api.name);
+	if (!locator) {
+		zlog_err("zrecv_static_srv6_locator_delete: lookup failed");
+		return 1;
+	}
+	static_srv6_locator_delete(locator);
+	return 0;
+}
+
+void zsend_static_srv6_function_add(struct srv6_function *function)
+{
+	struct stream *s;
+	uint32_t request_key;
+	struct srv6_locator *locator;
+
+	function->owner_proto = ZEBRA_ROUTE_STATIC;
+	function->owner_instance = zclient->instance;
+	request_key = random();
+
+	locator = static_srv6_locator_lookup(function->locator_name);
+	if (!locator) {
+		return;
+	}
+
+	while (static_srv6_function_find_by_request_key(locator, request_key)) {
+		request_key = random();
+	}
+	function->request_key = request_key;
+
+	s = zclient->obuf;
+	stream_reset(s);
+
+	zapi_srv6_function_encode(ZEBRA_SRV6_FUNCTION_ADD, s, function);
+	zclient_send_message(zclient);
+}
+
+static void static_zebra_send_srv6_function_set(struct srv6_function *function)
+{
+	if (true) {
+		char buf1[128];
+		char buf2[128];
+
+		zlog_debug("%s: sid: %s %s %s", __func__,
+				prefix2str(&function->prefix, buf1, 128),
+				seg6local_action2str(function->action),
+				seg6local_context2str(buf2, sizeof(buf2), &function->ctx, function->action));
+	}
+
+	struct zapi_route api;
+	memset(&api, 0, sizeof(api));
+	api.vrf_id = VRF_DEFAULT;
+	api.type = ZEBRA_ROUTE_STATIC;
+	api.safi = SAFI_UNICAST;
+	api.prefix = *(struct prefix*)&function->prefix;
+	api.nexthop_num = 1;
+	SET_FLAG(api.flags, ZEBRA_FLAG_SEG6LOCAL_ROUTE);
+	SET_FLAG(api.message, ZAPI_MESSAGE_NEXTHOP);
+
+	struct zapi_nexthop *api_nh = &api.nexthops[0];
+	api_nh->type = NEXTHOP_TYPE_IFINDEX;
+	api_nh->vrf_id = 0;
+	api_nh->ifindex = function->ifindex;
+	api_nh->seg6local_action = function->action;
+	memcpy(&api_nh->seg6local_ctx, &function->ctx, sizeof(function->ctx));
+
+	zclient_route_send(ZEBRA_ROUTE_ADD, zclient, &api);
+}
+
+static int zrecv_static_srv6_function_add(ZAPI_CALLBACK_ARGS)
+{
+	struct srv6_function api;
+	struct srv6_function *function;
+	struct srv6_locator *locator;
+
+	zapi_srv6_function_decode(zclient->ibuf, &api);
+	if (api.owner_proto != ZEBRA_ROUTE_STATIC) {
+		return 0;
+	}
+
+	locator = static_srv6_locator_lookup(api.locator_name);
+	if (!locator) {
+		return 1;
+	}
+
+	function = static_srv6_function_find_by_request_key(locator, api.request_key);
+	if (!function) {
+		return 1;
+	}
+
+	function->prefix = api.prefix;
+
+	static_zebra_send_srv6_function_set(function);
+	return 0;
+}
+
+void zsend_static_srv6_function_delete(struct srv6_function *function)
+{
+	struct stream *s;
+	unsigned char namelen = strlen(function->locator_name);
+	uint32_t request_key;
+	struct srv6_locator *locator;
+
+	function->owner_proto = ZEBRA_ROUTE_STATIC;
+	function->owner_instance = zclient->instance;
+	request_key = random();
+
+	locator = static_srv6_locator_lookup(function->locator_name);
+	if (!locator) {
+		return;
+	}
+
+	while (static_srv6_function_find_by_request_key(locator, request_key)) {
+		request_key = random();
+	}
+	function->request_key = request_key;
+
+	s = zclient->obuf;
+	stream_reset(s);
+
+	zclient_create_header(s, ZEBRA_SRV6_FUNCTION_DELETE, VRF_DEFAULT);
+
+	stream_putc(s, namelen);
+	stream_put(s, function->locator_name, namelen);
+	stream_put(s, &function->prefix, sizeof(function->prefix));
+	stream_putc(s, function->owner_proto);
+	stream_putw(s, function->owner_instance);
+	stream_putl(s, function->request_key);
+
+	stream_putw_at(s, 0, stream_get_endp(s));
+
+	zclient_send_message(zclient);
+}
+
+static int zrecv_static_srv6_function_delete(ZAPI_CALLBACK_ARGS)
+{
+	struct srv6_function api;
+	struct srv6_function *function;
+	struct srv6_locator *locator;
+
+	zapi_srv6_function_decode(zclient->ibuf, &api);
+
+	if (api.owner_proto != ZEBRA_ROUTE_STATIC) {
+		return 0;
+	}
+
+	locator = static_srv6_locator_lookup(api.locator_name);
+	if (!locator) {
+		return 1;
+	}
+
+	function = static_srv6_function_find_by_request_key(locator, api.request_key);
+	if (!function) {
+		return 1;
+	}
+
+	memset(function->locator_name, 0, sizeof(function->locator_name));
+	listnode_delete(locator->functions, function);
+
+	return 0;
 }
 
 static void static_zebra_capabilities(struct zclient_capabilities *cap)
@@ -480,6 +667,11 @@ void static_zebra_init(void)
 	zclient->interface_address_delete = interface_address_delete;
 	zclient->route_notify_owner = route_notify_owner;
 	zclient->nexthop_update = static_zebra_nexthop_update;
+
+	zclient->srv6_locator_add = zrecv_static_srv6_locator_add;
+	zclient->srv6_locator_delete = zrecv_static_srv6_locator_delete;
+	zclient->srv6_function_add = zrecv_static_srv6_function_add;
+	zclient->srv6_function_delete = zrecv_static_srv6_function_delete;
 
 	static_nht_hash = hash_create(static_nht_hash_key,
 				      static_nht_hash_cmp,

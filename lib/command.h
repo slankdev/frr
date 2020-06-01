@@ -147,6 +147,12 @@ enum node_type {
 	FORWARDING_NODE,	 /* IP forwarding node. */
 	PROTOCOL_NODE,		 /* protocol filtering node */
 	MPLS_NODE,		 /* MPLS config node */
+	SR_NODE,		 /* SR node */
+	SRV6_NODE,		 /* SRv6 node */
+	SRV6_LOCS_NODE,		 /* SRv6 locators node */
+	SRV6_LOC_NODE,		 /* SRv6 locator node */
+	SRV6_ENCAP_NODE,	 /* SRv6 encaps node */
+	BGP_SRV6_NODE,		 /* BGP SRv6 node */
 	PW_NODE,		 /* Pseudowire config node */
 	VTY_NODE,		 /* Vty node. */
 	LINK_PARAMS_NODE,	/* Link-parameters node */

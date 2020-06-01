@@ -17,8 +17,18 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <stddef.h>
+#include <zebra.h>
+#include "prefix.h"
 #include "srv6.h"
 #include "log.h"
+
+DEFINE_QOBJ_TYPE(srv6_locator)
+DEFINE_MTYPE_STATIC(LIB, SRV6_LOCATOR, "SRV6 locator")
+DEFINE_MTYPE_STATIC(LIB, SRV6_FUNCTION, "SRV6 function")
 
 const char *seg6local_action2str(uint32_t action)
 {
@@ -74,7 +84,7 @@ int snprintf_seg6_segs(char *str,
 }
 
 const char *seg6local_context2str(char *str, size_t size,
-		struct seg6local_context *ctx, uint32_t action)
+		const struct seg6local_context *ctx, uint32_t action)
 {
 	char b0[128];
 
@@ -113,4 +123,80 @@ const char *seg6local_context2str(char *str, size_t size,
 		snprintf(str, size, "unknown(%s)", __func__);
 		return str;
 	}
+}
+
+struct srv6_locator *srv6_locator_alloc(const char *name)
+{
+	int namelen = 0;
+	struct srv6_locator *locator = NULL;
+
+	locator = XCALLOC(MTYPE_SRV6_LOCATOR, sizeof(struct srv6_locator));
+	if (locator) {
+		namelen = sizeof(locator->name);
+		if (namelen > SRV6_LOCNAME_SIZE - 1)
+			namelen = SRV6_LOCNAME_SIZE - 1;
+		strlcpy(locator->name, name, namelen);
+		locator->current = 0;
+		locator->functions = list_new();
+		QOBJ_REG(locator, srv6_locator);
+	}
+	return locator;
+}
+
+void srv6_locator_free(struct srv6_locator *locator)
+{
+	XFREE(MTYPE_SRV6_LOCATOR, locator);
+}
+
+struct srv6_function *srv6_function_alloc(const struct prefix_ipv6 *prefix)
+{
+	struct srv6_function *function = NULL;
+
+	function = XCALLOC(MTYPE_SRV6_FUNCTION, sizeof(struct srv6_function));
+	if (function)
+		function->prefix = *prefix;
+	return function;
+}
+
+void srv6_function_init(struct srv6_function *function,
+		const char *locator_name,
+		const struct prefix_ipv6 *prefix)
+{
+	memset(function, 0, sizeof(*function));
+	function->prefix.family = AF_INET6;
+	strlcpy(function->locator_name, locator_name,
+		sizeof(function->locator_name));
+	if (prefix)
+		function->prefix = *prefix;
+}
+
+void srv6_function_free(struct srv6_function *function)
+{
+	XFREE(MTYPE_SRV6_FUNCTION, function);
+}
+
+const char *srv6_function2str(
+		const struct srv6_function *function,
+		char *str, size_t size)
+{
+	char buf[128], buf2[128];
+
+	prefix2str(&function->prefix, buf, sizeof(buf));
+	snprintf(str, size, "%s locator=%s own=%s action=%s(%s) ifindex=%u %s",
+		 buf, function->locator_name,
+		 zebra_route_string(function->owner_proto),
+		 seg6local_action2str(function->action),
+		 seg6local_context2str(buf2, sizeof(buf2),
+			(struct seg6local_context *)&function->ctx,
+			function->action),
+		 function->ifindex,
+		 function->explicit_allocate?"explicit-alloc":"auto-alloc");
+	return str;
+}
+
+const char *srv6_locator2str(
+		const struct srv6_function *function,
+		char *str, size_t size)
+{
+	return "";
 }

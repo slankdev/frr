@@ -1125,6 +1125,14 @@ void bgp_attr_flush(struct attr *attr)
 		encap_free(attr->encap_subtlvs);
 		attr->encap_subtlvs = NULL;
 	}
+	if (attr->srv6_vpn && !attr->srv6_vpn->refcnt) {
+		srv6_vpn_free(attr->srv6_vpn);
+		attr->srv6_vpn = NULL;
+	}
+	if (attr->srv6_l3vpn && !attr->srv6_l3vpn->refcnt) {
+		srv6_l3vpn_free(attr->srv6_l3vpn);
+		attr->srv6_l3vpn = NULL;
+	}
 #if ENABLE_BGP_VNC
 	if (attr->vnc_subtlvs && !attr->vnc_subtlvs->refcnt) {
 		encap_free(attr->vnc_subtlvs);
@@ -2388,9 +2396,9 @@ static bgp_attr_parse_ret_t bgp_attr_psid_sub(uint8_t type, uint16_t length,
 		 * labeled-unicast
 		 * SAFI.
 		 */
-		if (!mp_update->length
-		    || mp_update->safi != SAFI_LABELED_UNICAST)
-			attr->label_index = BGP_INVALID_LABEL_INDEX;
+		/* if (!mp_update->length */
+		/*     || mp_update->safi != SAFI_LABELED_UNICAST) */
+		/* 	attr->label_index = BGP_INVALID_LABEL_INDEX; */
 	}
 
 	/* Placeholder code for the IPv6 SID type */
@@ -2583,6 +2591,7 @@ bgp_attr_parse_ret_t bgp_attr_prefix_sid(struct bgp_attr_parser_args *args,
 {
 	struct peer *const peer = args->peer;
 	struct attr *const attr = args->attr;
+	uint16_t total_length = args->length;
 	bgp_attr_parse_ret_t ret;
 
 	attr->flag |= ATTR_FLAG_BIT(BGP_ATTR_PREFIX_SID);
@@ -2591,7 +2600,7 @@ bgp_attr_parse_ret_t bgp_attr_prefix_sid(struct bgp_attr_parser_args *args,
 	uint16_t length;
 	size_t headersz = sizeof(type) + sizeof(length);
 
-	while (STREAM_READABLE(peer->curr) > 0) {
+	while (STREAM_READABLE(peer->curr) > 0 && total_length > 0) {
 
 		if (STREAM_READABLE(peer->curr) < headersz) {
 			flog_err(
@@ -2621,6 +2630,8 @@ bgp_attr_parse_ret_t bgp_attr_prefix_sid(struct bgp_attr_parser_args *args,
 
 		if (ret != BGP_ATTR_PARSE_PROCEED)
 			return ret;
+
+		total_length -= length + headersz;
 	}
 
 	return BGP_ATTR_PARSE_PROCEED;

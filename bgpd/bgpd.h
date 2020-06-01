@@ -29,6 +29,7 @@
 #include "lib/json.h"
 #include "vrf.h"
 #include "vty.h"
+#include "srv6.h"
 #include "iana_afi.h"
 
 /* For union sockunion.  */
@@ -193,6 +194,12 @@ typedef enum {
 	BGP_VPN_POLICY_DIR_MAX = 2
 } vpn_policy_direction_t;
 
+enum srv6_vpn_version {
+	BGP_VPN_SRV6_DAWRA_04,
+	BGP_VPN_SRV6_DAWRA_05,
+	MAX_BGP_VPN_SRV6,
+};
+
 struct vpn_policy {
 	struct bgp *bgp; /* parent */
 	afi_t afi;
@@ -210,6 +217,8 @@ struct vpn_policy {
 #define BGP_VPN_POLICY_TOVPN_LABEL_AUTO        (1 << 0)
 #define BGP_VPN_POLICY_TOVPN_RD_SET            (1 << 1)
 #define BGP_VPN_POLICY_TOVPN_NEXTHOP_SET       (1 << 2)
+#define BGP_VPN_POLICY_TOVPN_SID_EXPORT        (1 << 3)
+#define BGP_VPN_POLICY_TOVPN_SID_EXPLICIT      (1 << 4)
 
 	/*
 	 * If we are importing another vrf into us keep a list of
@@ -222,6 +231,16 @@ struct vpn_policy {
 	 * vrf names that we are being exported to.
 	 */
 	struct list *export_vrf;
+
+	/*
+	 * Segment-Routing SRv6 Mode
+	 */
+	bool enable_srv6_vpn;
+	enum srv6_vpn_version srv6_vpn_version;
+	struct in6_addr tovpn_sid;
+	struct in6_addr tovpn_sid_explicit_config;
+	struct in6_addr tovpn_zebra_vrf_sid_last_sent;
+	struct prefix_ipv6 sid_locator;
 };
 
 /*
@@ -649,6 +668,10 @@ struct bgp {
 
 	/* Count of peers in established state */
 	uint32_t established_peers;
+
+	/* SRv6 Locator */
+	struct srv6_locator *srv6_locator; //TODO(slankdev): delete
+	char srv6_locator_name[SRV6_LOCNAME_SIZE];
 
 	QOBJ_FIELDS
 };

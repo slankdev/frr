@@ -138,6 +138,12 @@ const char *const node_names[] = {
 	"forwarding",		    // FORWARDING_NODE,
 	"protocol",		    // PROTOCOL_NODE,
 	"mpls",			    // MPLS_NODE,
+	"sr",			    // SR_NODE,
+	"srv6",			    // SRV6_NODE,
+	"srv6-locators",	    // SRV6_LOCS_NODE,
+	"srv6-locator",		    // SRV6_LOC_NODE,
+	"srv6-encap",		    // SRV6_ENCAP_NODE,
+	"bgp-srv6",		    // BGP_SRV6_NODE,
 	"pw",			    // PW_NODE,
 	"vty",			    // VTY_NODE,
 	"link-params",		    // LINK_PARAMS_NODE,
@@ -978,6 +984,7 @@ enum node_type node_parent(enum node_type node)
 	case BGP_EVPN_NODE:
 	case BGP_IPV6L_NODE:
 	case BMP_NODE:
+	case BGP_SRV6_NODE:
 		ret = BGP_NODE;
 		break;
 	case BGP_EVPN_VNI_NODE:
@@ -1004,6 +1011,16 @@ enum node_type node_parent(enum node_type node)
 		break;
 	case BFD_PEER_NODE:
 		ret = BFD_NODE;
+		break;
+	case SRV6_NODE:
+		ret = SR_NODE;
+		break;
+	case SRV6_LOCS_NODE:
+	case SRV6_ENCAP_NODE:
+		ret = SRV6_NODE;
+		break;
+	case SRV6_LOC_NODE:
+		ret = SRV6_LOCS_NODE;
 		break;
 	default:
 		ret = CONFIG_NODE;

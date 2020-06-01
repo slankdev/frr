@@ -19,7 +19,12 @@
 #ifndef __STATIC_ZEBRA_H__
 #define __STATIC_ZEBRA_H__
 
+#include "staticd/static_srv6.h"
+
 extern struct thread_master *master;
+
+extern void zsend_static_srv6_function_add(struct srv6_function *function);
+extern void zsend_static_srv6_function_delete(struct srv6_function *function);
 
 extern void static_zebra_nht_register(struct route_node *rn,
 				      struct static_route *si, bool reg);

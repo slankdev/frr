@@ -559,6 +559,142 @@ presence of the entry.
    21     Static       10.125.0.2  IPv4 Explicit Null
 
 
+.. _zebra-srv6:
+
+Segment-Routing SRv6
+====================
+
+Segment-Routing is soruce routing paradime that allows
+network operator to encode network intent into the packets.
+SRv6 is one of the implementation of Segment-Routing
+with application of IPv6 and segment-routing-header.
+
+All routing daemon can use the Segment-Routing base
+framework implemented on zebra to use SRv6 routing mechanism.
+In that case, user must configure initial srv6 setting on
+FRR's cli or frr.conf or zebra.conf. This section shows how
+to configure SRv6 on FRR. Of course SRv6 can be used as standalone,
+and this section also helps that case.
+
+.. index:: show segment-routing srv6 locator [json]
+.. clicmd:: show segment-routing srv6 locator [json]
+
+   This commnand dump SRv6-locator configured on zebra.
+   SRv6-locator is used to route to the node before performing
+   the SRv6-function. and that works as aggregation of
+   SRv6-function's IDs (SIDs).
+   Following console log shows two SRv6-locators LOC1 and LOC2.
+   All locators are identified by unique IPv6 prefix.
+   User can get that information as JSON string when ``json``
+   key word at the end of cli is presented.
+
+::
+
+   router# sh segment-routing-ipv6 locator
+   Locator:
+   Name                 ID      Prefix                   Status
+   -------------------- ------- ------------------------ -------
+   hoge                       1 1::/64                   Up
+   fuga                       2 2::/64                   Up
+
+.. index:: show segment-routing srv6 sid [json]
+.. clicmd:: show segment-routing srv6 sid [json]
+
+   This commnand dump current allocated SID (Segment-Routing ID)
+   on each SRv6-locator. Following console log shows three SRv6-funcions.
+   1st one is configured as default-SID that is auto configured
+   each SRv6-locators. 2nd and 3rd ones are configured by bgpd.
+   User can get that information as JSON string when ``json``
+   key word at the end of cli is presented.
+
+::
+
+   router# sh segment-routing srv6 sid
+   Local SIDs:
+    Name       Context              Prefix                   Owner
+   ---------- -------------------- ------------------------ ------------
+    End        USP                  2001:db8:1:1:1::/80      static
+    End.DT4    table 1              2001:db8:1:1:3::/80      bgp
+    End.DT4    table 2              2001:db8:1:1:7::/80      bgp
+
+.. index:: segment-routing
+.. clicmd:: segment-routing
+.. index:: srv6
+.. clicmd:: srv6
+.. index:: locators
+.. clicmd:: locators
+
+   User can enter the SRv6 configuration node with ``segment-routing`` and
+   ``srv6`` commands in configure mode. If there is some SRv6-locator exist,
+   SRv6 feature is looked enabled. and this affects running-config.
+
+   User can enter the Locators node with ``locators`` command.
+   in srv6 configure mode.
+   After entering locators node, user can configure one or multi SRv6-locators.
+
+.. index:: locator NAME
+.. clicmd:: locator NAME
+.. index:: prefix X:X::X:X/M [function-bits-length 32]
+.. clicmd:: prefix X:X::X:X/M [function-bits-length 32]
+
+   Following example console log is show the typical configuration of
+   SRv6 data-plane. 1st, new SRv6 locator named LOC1 is created with
+   ``locator LOC1`` command. Then LOC1's prefix is configured as
+   ``2001:db8:a:a::/64`` If user or some routing daemon allocate new SID,
+   new SID will allocated in range of this prefix. (i.e. ``2001:db8:a:a:7::/80``)
+   Each locator has default SID that is very simple SRv6 local function
+   End. Usually default SID is allocated as ``PREFIX:1::``.
+
+   Default function bits range is 16bits. this is implicit configured.
+   If operator want to change function bits range, they can configure
+   with function-bits-length option.
+
+::
+
+   router# configure terminal
+   router(config)# segment-routinig
+   router(config-sr)# srv6
+   router(config-srv6)# locators
+   router(config-srv6-locs)# locator LOC1
+   router(config-srv6-loc)# prefix 2001:db8:a:a::/64
+
+   router(config-srv6-loc)# show run
+   ...
+   segment-routing
+    srv6
+     locators
+      locator LOC1
+       prefix 2001:db8:a:a::/64
+      !
+   ...
+
+.. index:: function [auto | X:X::X:X] action ACTION ACTIONARG DEVICE
+.. clicmd:: function [auto | X:X::X:X] action ACTION ACTIONARG DEVICE
+
+  FRR can configure explicit SRv6 function setting.
+  User can configure lika-e ``ip -6 route add encap seg6local`` on FRR's cli.
+  SID can be configure both dynamic allocation and explicit allcoation.
+  If you chose explicit allocation, specified SID value must be in range
+  of locator's prefix.
+
+Following console log shows you both dynamic allocated SID and
+Explicit allocated sid.
+
+::
+
+  router(config-srv6-loc)# prefix 2001:db8:a:a::/64
+  router(config-srv6-loc)# function auto action endx 2001::10 eth0
+  router(config-srv6-loc)# function 2001:db8:a:a:beaf:: action endx 2001::20 eth1
+
+  router(config-srv6-loc)# do sh segment-routing srv6 sid
+  Local SIDs:
+   Name       Context              Prefix                   Owner
+  ---------- -------------------- ------------------------ ------------
+   End        USP                  2001:db8:a:a:1::/80      static
+   End.X      2001::10 eth0        2001:db8:a:a:3::/80      static
+   End.X      2001::20 eth1        2001:db8:a:a:beaf::/80   static
+
+
 .. _multicast-rib-commands:
 
 Multicast RIB Commands
