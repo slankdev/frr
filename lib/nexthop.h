@@ -146,6 +146,14 @@ struct nexthop {
 
 	/* SR-TE color used for matching SR-TE policies */
 	uint32_t srte_color;
+
+	/* seg6 */
+	enum seg6_mode_t nh_seg6_mode;
+	struct seg6_segs *nh_seg6_segs;
+
+	/* seg6local */
+	enum seg6local_action_t nh_seg6local_action;
+	struct seg6local_context *nh_seg6local_ctx;
 };
 
 /* Utility to append one nexthop to another. */
