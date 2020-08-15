@@ -175,8 +175,9 @@ def test_route_install():
     # for the highest ecmp steps. Executing 'show' at scale can be costly
     # so we widen the interval there too.
     scale_steps = [
-        [1, 'one'], [2, 'two'], [4, 'four'],
-        [8, 'eight'], [16, 'sixteen', 10, 40], [32, 'thirtytwo', 10, 40]
+        [1, 'one'],
+        # [2, 'two'], [4, 'four'],
+        # [8, 'eight'], [16, 'sixteen', 10, 40], [32, 'thirtytwo', 10, 40]
     ]
 
     # Build up a list of dicts with params for each step of the test;
