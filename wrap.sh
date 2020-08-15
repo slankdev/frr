@@ -12,7 +12,7 @@
   --enable-user=frr \
   --enable-group=frr \
   --enable-vty-group=frrvty \
-	--enable-address-sanitizer \
+  --enable-address-sanitizer \
   --with-pkg-extra-version=-play-imifumei-behavior-with-asan
 
 #--enable-address-sanitizer
