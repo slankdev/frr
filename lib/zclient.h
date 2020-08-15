@@ -405,6 +405,9 @@ struct zapi_nexthop {
 	uint8_t label_num;
 	mpls_label_t labels[MPLS_MAX_LABELS];
 
+	/* SRv6 segs for Transit-behaviour */
+	uint8_t seg6_segs_num;
+
 	/* SRv6 localsid info for Endpoint-behaviour */
 	uint32_t seg6local_action;
 	struct seg6local_context seg6local_ctx;
