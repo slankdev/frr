@@ -1580,6 +1580,14 @@ static void zread_route_add(ZAPI_HANDLER_ARGS)
 	char nhbuf[NEXTHOP_STRLEN];
 	char labelbuf[MPLS_LABEL_STRLEN];
 
+	if (true) {
+		static size_t cnt = 0;
+		cnt ++;
+		if (cnt % 10000 == 0) {
+			zlog_info("%s: slankdev cnt=%zd", __func__, cnt);
+		}
+	}
+
 	s = msg;
 	if (zapi_route_decode(s, &api) < 0) {
 		if (IS_ZEBRA_DEBUG_RECV)
