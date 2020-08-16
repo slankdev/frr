@@ -407,7 +407,7 @@ struct zapi_nexthop {
 
 	/* SRv6 segs for Transit-behaviour */
 	uint8_t seg6_segs_num;
-	//struct in6_addr seg6_segs[SRV6_MAX_SIDS];
+	struct in6_addr *seg6_segs;
 
 	/* SRv6 localsid info for Endpoint-behaviour */
 	uint32_t seg6local_action;
