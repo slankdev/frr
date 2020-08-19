@@ -983,6 +983,12 @@ int zapi_nexthop_encode(struct stream *s, const struct zapi_nexthop *api_nh,
 			stream_putc(s, api_nh->backup_idx[i]);
 	}
 
+	if (CHECK_FLAG(api_flags, ZEBRA_FLAG_SEG6_ROUTE)) {
+		stream_putc(s, api_nh->seg6_segs_num);
+		for (uint8_t i = 0; i < api_nh->seg6_segs_num; i++)
+			stream_write(s, &api_nh->seg6_segs[i], 16);
+	}
+
 	if (CHECK_FLAG(api_flags, ZEBRA_FLAG_SEG6LOCAL_ROUTE)) {
 		stream_putl(s, api_nh->seg6local_action);
 		stream_write(s, &api_nh->seg6local_ctx,
@@ -1214,6 +1220,12 @@ static int zapi_nexthop_decode(struct stream *s, struct zapi_nexthop *api_nh,
 
 		for (i = 0; i < api_nh->backup_num; i++)
 			STREAM_GETC(s, api_nh->backup_idx[i]);
+	}
+
+	if (CHECK_FLAG(api_flags, ZEBRA_FLAG_SEG6_ROUTE)) {
+		STREAM_GETC(s, api_nh->seg6_segs_num);
+		for (uint8_t i = 0; i < api_nh->seg6_segs_num; i++)
+			STREAM_GET(&api_nh->seg6_segs[i], s, 16);
 	}
 
 	if (CHECK_FLAG(api_flags, ZEBRA_FLAG_SEG6LOCAL_ROUTE)) {
