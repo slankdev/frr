@@ -405,6 +405,10 @@ struct zapi_nexthop {
 	uint8_t label_num;
 	mpls_label_t labels[MPLS_MAX_LABELS];
 
+	/* SRv6 localsid info for Endpoint-behaviour */
+	uint32_t seg6local_action;
+	struct seg6local_context seg6local_ctx;
+
 	struct ethaddr rmac;
 
 	uint32_t weight;
@@ -475,6 +479,16 @@ struct zapi_route {
  * route entry.  This mainly is used for backup static routes.
  */
 #define ZEBRA_FLAG_RR_USE_DISTANCE    0x40
+/*
+ * This flag tells Zebra that the route is a seg6 route and should
+ * be treated specially.
+ */
+#define ZEBRA_FLAG_SEG6_ROUTE         0x80
+/*
+ * This flag tells Zebra that the route is a seg6local route and
+ * should be treated specially.
+ */
+#define ZEBRA_FLAG_SEG6LOCAL_ROUTE   0x100
 
 	/* The older XXX_MESSAGE flags live here */
 	uint32_t message;
