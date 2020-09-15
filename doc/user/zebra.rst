@@ -679,6 +679,33 @@ and this section also helps that case.
       !
    ...
 
+.. index:: function [auto | X:X::X:X] action ACTION ACTIONARG DEVICE
+.. clicmd:: function [auto | X:X::X:X] action ACTION ACTIONARG DEVICE
+
+  FRR can configure explicit SRv6 function setting.
+  User can configure ``ip -6 route add encap seg6local`` on FRR's cli.
+  SID can be configure both dynamic allocation and explicit allocation.
+  If you chose explicit allocation, specified SID value must be in range
+  of locator's prefix.
+
+Following console log shows you both dynamic allocated SID and
+Explicit allocated sid.
+
+::
+
+  router(config-srv6-loc)# prefix 2001:db8:a:a::/64
+  router(config-srv6-loc)# function auto action endx 2001::10 eth0
+  router(config-srv6-loc)# function 2001:db8:a:a:beaf:: action endx 2001::20 eth1
+
+  router(config-srv6-loc)# do sh segment-routing srv6 sid
+  Local SIDs:
+   Name       Context              Prefix                   Owner
+  ---------- -------------------- ------------------------ ------------
+   End        USP                  2001:db8:a:a:1::/80      static
+   End.X      2001::10 eth0        2001:db8:a:a:3::/80      static
+   End.X      2001::20 eth1        2001:db8:a:a:beaf::/80   static
+
+
 .. _multicast-rib-commands:
 
 Multicast RIB Commands
