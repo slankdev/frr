@@ -863,6 +863,15 @@ enum node_type node_parent(enum node_type node)
 	case BFD_PROFILE_NODE:
 		ret = BFD_NODE;
 		break;
+	case SRV6_NODE:
+		ret = SR_NODE;
+		break;
+	case SRV6_LOCS_NODE:
+		ret = SRV6_NODE;
+		break;
+	case SRV6_LOC_NODE:
+		ret = SRV6_LOCS_NODE;
+		break;
 	default:
 		ret = CONFIG_NODE;
 		break;
