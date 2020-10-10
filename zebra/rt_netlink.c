@@ -483,6 +483,7 @@ static uint8_t parse_multipath_nexthops_unicast(ns_id_t ns_id,
 						struct rtattr **tb,
 						void *prefsrc, vrf_id_t vrf_id)
 {
+	marker_debug_msg("call");
 	void *gate = NULL;
 	struct interface *ifp = NULL;
 	int index = 0;
@@ -583,6 +584,7 @@ static uint8_t parse_multipath_nexthops_unicast(ns_id_t ns_id,
 static int netlink_route_change_read_unicast(struct nlmsghdr *h, ns_id_t ns_id,
 					     int startup)
 {
+	marker_debug_msg("call");
 	int len;
 	struct rtmsg *rtm;
 	struct rtattr *tb[RTA_MAX + 1];

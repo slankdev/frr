@@ -701,6 +701,7 @@ void nexthop_copy_no_recurse(struct nexthop *copy,
 			     const struct nexthop *nexthop,
 			     struct nexthop *rparent)
 {
+	marker_debug_msg("call");
 	copy->vrf_id = nexthop->vrf_id;
 	copy->ifindex = nexthop->ifindex;
 	copy->type = nexthop->type;
