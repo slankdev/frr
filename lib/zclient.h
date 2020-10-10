@@ -895,7 +895,7 @@ extern int tm_get_table_chunk(struct zclient *zclient, uint32_t chunk_size,
 			      uint32_t *start, uint32_t *end);
 extern int tm_release_table_chunk(struct zclient *zclient, uint32_t start,
 				  uint32_t end);
-extern int srv6_manager_connect(struct zclient *zclient, int async);
+extern int srv6_manager_connect(struct zclient *zclient);
 
 extern int zebra_send_sr_policy(struct zclient *zclient, int cmd,
 				struct zapi_sr_policy *zp);

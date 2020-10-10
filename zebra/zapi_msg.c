@@ -1069,6 +1069,29 @@ static int zsend_table_manager_connect_response(struct zserv *client,
 	return zserv_send_message(client, s);
 }
 
+static int zsend_srv6_manager_connect_response(struct zserv *client,
+						vrf_id_t vrf_id,
+						uint16_t result)
+{
+	struct stream *s = stream_new(ZEBRA_MAX_PACKET_SIZ);
+
+	zclient_create_header(s, ZEBRA_SRV6_MANAGER_CONNECT, vrf_id);
+
+	/* proto */
+	stream_putc(s, client->proto);
+
+	/* instance */
+	stream_putw(s, client->instance);
+
+	/* result */
+	stream_putc(s, result);
+
+	/* Write packet size. */
+	stream_putw_at(s, 0, stream_get_endp(s));
+
+	return zserv_send_message(client, s);
+}
+
 int zsend_bcast_zebra_srv6_locator_add(struct srv6_locator *locator)
 {
 	struct listnode *node;
@@ -2614,6 +2637,49 @@ int zsend_sr_policy_notify_status(uint32_t color, struct ipaddr *endpoint,
 	return zserv_send_message(client, s);
 }
 
+/* Send response to a srv6 manager connect request to client */
+static void zread_srv6_manager_connect(struct zserv *client,
+					struct stream *msg, vrf_id_t vrf_id)
+{
+	struct stream *s;
+	uint8_t proto;
+	uint16_t instance;
+	struct vrf *vrf = vrf_lookup_by_id(vrf_id);
+
+	s = msg;
+
+	/* Get data. */
+	STREAM_GETC(s, proto);
+	STREAM_GETW(s, instance);
+
+	/* accept only dynamic routing protocols */
+	if ((proto >= ZEBRA_ROUTE_MAX) || (proto <= ZEBRA_ROUTE_STATIC)) {
+		flog_err(EC_ZEBRA_TM_WRONG_PROTO,
+			 "client %d has wrong protocol %s", client->sock,
+			 zebra_route_string(proto));
+		// TODO(slankdev):
+		// zsend_srv6_manager_connect_response(client, vrf_id, 1);
+		return;
+	}
+	zlog_notice("client %d with vrf %s(%u) instance %u connected as %s",
+		    client->sock, VRF_LOGNAME(vrf), vrf_id, instance,
+		    zebra_route_string(proto));
+	client->proto = proto;
+	client->instance = instance;
+
+	// TODO(slankdev): srv6 locator chunk isn't supported.
+	// /*
+	//  * Release previous labels of same protocol and instance.
+	//  * This is done in case it restarted from an unexpected shutdown.
+	//  */
+	// release_daemon_table_chunks(client);
+
+	zsend_srv6_manager_connect_response(client, vrf_id, 0);
+
+stream_failure:
+	return;
+}
+
 /* Send response to a table manager connect request to client */
 static void zread_table_manager_connect(struct zserv *client,
 					struct stream *msg, vrf_id_t vrf_id)
@@ -2820,6 +2886,20 @@ static void zread_table_manager_request(ZAPI_HANDLER_ARGS)
 			zread_get_table_chunk(client, msg, zvrf_id(zvrf));
 		else if (hdr->command == ZEBRA_RELEASE_TABLE_CHUNK)
 			zread_release_table_chunk(client, msg);
+	}
+}
+
+static void zread_srv6_manager_request(ZAPI_HANDLER_ARGS)
+{
+	marker_debug_msg("call");
+
+	switch (hdr->command) {
+	case ZEBRA_SRV6_MANAGER_CONNECT:
+		zread_srv6_manager_connect(client, msg, zvrf_id(zvrf));
+		break;
+	default:
+		zlog_err("%s: unknown SRv6 Mamanger command", __func__);
+		break;
 	}
 }
 
@@ -3387,6 +3467,7 @@ void (*const zserv_handlers[])(ZAPI_HANDLER_ARGS) = {
 	[ZEBRA_MLAG_FORWARD_MSG] = zebra_mlag_forward_client_msg,
 	[ZEBRA_SRV6_FUNCTION_ADD] = zrecv_zebra_srv6_function_add,
 	[ZEBRA_SRV6_FUNCTION_DELETE] = zrecv_zebra_srv6_function_delete,
+	[ZEBRA_SRV6_MANAGER_CONNECT] = zread_srv6_manager_request,
 	[ZEBRA_CLIENT_CAPABILITIES] = zread_client_capabilities,
 	[ZEBRA_NEIGH_DISCOVER] = zread_neigh_discover,
 	[ZEBRA_NHG_ADD] = zread_nhg_add,
