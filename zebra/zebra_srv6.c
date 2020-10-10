@@ -43,6 +43,42 @@
 #include <netinet/in.h>
 
 
+DEFINE_MGROUP(SRV6_MGR, "SRv6 Manager");
+DEFINE_MTYPE_STATIC(SRV6_MGR, SRV6M_CHUNK, "SRv6 Manager Chunk");
+
+/* define hooks for the basic API, so that it can be specialized or served
+ * externally
+ */
+
+DEFINE_HOOK(srv6_manager_client_connect,
+	    (struct zserv *client, vrf_id_t vrf_id),
+	    (client, vrf_id));
+DEFINE_HOOK(srv6_manager_client_disconnect,
+	    (struct zserv *client), (client));
+DEFINE_HOOK(srv6_manager_get_chunk,
+	    (struct srv6_locator * *mc, struct zserv *client,
+	     uint8_t keep, uint32_t size, uint32_t base, vrf_id_t vrf_id),
+	    (mc, client, keep, size, base, vrf_id));
+DEFINE_HOOK(srv6_manager_release_chunk,
+	    (struct zserv *client, uint32_t start, uint32_t end),
+	    (client, start, end));
+
+/* define wrappers to be called in zapi_msg.c (as hooks must be called in
+ * source file where they were defined)
+ */
+
+void srv6_manager_client_connect_call(struct zserv *client, vrf_id_t vrf_id)
+{
+	hook_call(srv6_manager_client_connect, client, vrf_id);
+}
+
+int srv6_manager_client_disconnect_cb(struct zserv *client)
+{
+	hook_call(srv6_manager_client_disconnect, client);
+	return 0;
+}
+
+
 static void set_seg6local_end(struct prefix_ipv6 *prefix)
 {
 	struct route_entry *re;
