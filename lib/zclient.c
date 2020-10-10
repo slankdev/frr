@@ -2853,17 +2853,20 @@ int tm_table_manager_connect(struct zclient *zclient)
 	int ret;
 	struct stream *s;
 	uint8_t result;
+	uint16_t cmd = ZEBRA_TABLE_MANAGER_CONNECT;
 
 	if (zclient_debug)
 		zlog_debug("Connecting to Table Manager");
 
-	if (zclient->sock < 0)
+	if (zclient->sock < 0) {
+		zlog_debug("%s: invalid zclient socket", __func__);
 		return -1;
+	}
 
 	/* send request */
 	s = zclient->obuf;
 	stream_reset(s);
-	zclient_create_header(s, ZEBRA_TABLE_MANAGER_CONNECT, VRF_DEFAULT);
+	zclient_create_header(s, cmd, VRF_DEFAULT);
 
 	/* proto */
 	stream_putc(s, zclient->redist_default);
@@ -2881,7 +2884,7 @@ int tm_table_manager_connect(struct zclient *zclient)
 		zlog_debug("%s: Table manager connect request sent", __func__);
 
 	/* read response */
-	if (zclient_read_sync_response(zclient, ZEBRA_TABLE_MANAGER_CONNECT)
+	if (zclient_read_sync_response(zclient, cmd)
 	    != 0)
 		return -1;
 
