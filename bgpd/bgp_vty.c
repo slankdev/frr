@@ -8489,6 +8489,16 @@ DEFUN_NOSH (exit_address_family,
 	return CMD_SUCCESS;
 }
 
+DEFUN_NOSH (bgp_segment_routing_srv6,
+       bgp_segment_routing_srv6_cmd,
+       "segment-routing srv6",
+       "Segment-Routing configuration\n"
+       "Segment-Routing SRv6 configuration\n")
+{
+	vty->node = BGP_VPNV4_SRV6_NODE;
+	return CMD_SUCCESS;
+}
+
 /* Recalculate bestpath and re-advertise a prefix */
 static int bgp_clear_prefix(struct vty *vty, const char *view_name,
 			    const char *ip_str, afi_t afi, safi_t safi,
@@ -16066,6 +16076,13 @@ static struct cmd_node bgp_flowspecv6_node = {
 	.prompt = "%s(config-router-af-vpnv6)# ",
 };
 
+static struct cmd_node bgp_vpnv4_srv6_node = {
+	.name = "bgp vpnv4 srv6",
+	.node = BGP_VPNV4_SRV6_NODE,
+	.parent_node = BGP_VPNV4_NODE,
+	.prompt = "%s(config-router-af-srv6)# ",
+};
+
 static void community_list_vty(void);
 
 static void bgp_ac_neighbor(vector comps, struct cmd_token *token)
@@ -16135,6 +16152,7 @@ void bgp_vty_init(void)
 	install_node(&bgp_ipv6_multicast_node);
 	install_node(&bgp_ipv6_labeled_unicast_node);
 	install_node(&bgp_vpnv4_node);
+	install_node(&bgp_vpnv4_srv6_node);
 	install_node(&bgp_vpnv6_node);
 	install_node(&bgp_evpn_node);
 	install_node(&bgp_evpn_vni_node);
@@ -16150,6 +16168,7 @@ void bgp_vty_init(void)
 	install_default(BGP_IPV6M_NODE);
 	install_default(BGP_IPV6L_NODE);
 	install_default(BGP_VPNV4_NODE);
+	install_default(BGP_VPNV4_SRV6_NODE);
 	install_default(BGP_VPNV6_NODE);
 	install_default(BGP_FLOWSPECV4_NODE);
 	install_default(BGP_FLOWSPECV6_NODE);
@@ -17443,6 +17462,9 @@ void bgp_vty_init(void)
 	install_element(BGP_IPV6_NODE, &af_no_route_map_vpn_imexport_cmd);
 	install_element(BGP_IPV4_NODE, &af_no_import_vrf_route_map_cmd);
 	install_element(BGP_IPV6_NODE, &af_no_import_vrf_route_map_cmd);
+
+	/* vpn with srv6 backend */
+	install_element(BGP_VPNV4_NODE, &bgp_segment_routing_srv6_cmd);
 }
 
 #include "memory.h"

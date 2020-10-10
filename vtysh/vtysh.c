@@ -1407,6 +1407,13 @@ static struct cmd_node bmp_node = {
 	.parent_node = BGP_NODE,
 	.prompt = "%s(config-bgp-bmp)# "
 };
+
+static struct cmd_node bgp_vpnv4_srv6_node = {
+	.name = "bgp vpnv4 srv6",
+	.node = BGP_VPNV4_SRV6_NODE,
+	.parent_node = BGP_VPNV4_NODE,
+	.prompt = "%s(config-router-af-srv6)# ",
+};
 #endif /* HAVE_BGPD */
 
 #ifdef HAVE_OSPFD
@@ -1834,6 +1841,18 @@ DEFUNSH(VTYSH_BGPD, vnc_l2_group, vnc_l2_group_cmd, "vnc l2-group NAME",
 	return CMD_SUCCESS;
 }
 #endif
+
+DEFUNSH(VTYSH_BGPD,
+	bgp_segment_routing_srv6,
+	bgp_segment_routing_srv6_cmd,
+	"segment-routing srv6",
+	"Segment-Routing configuration\n"
+	"Segment-Routing SRv6 configuration\n")
+{
+	vty->node = BGP_VPNV4_SRV6_NODE;
+	return CMD_SUCCESS;
+}
+
 #endif /* HAVE_BGPD */
 
 DEFUNSH(VTYSH_KEYS, key_chain, key_chain_cmd, "key chain WORD",
@@ -3959,6 +3978,12 @@ void vtysh_init_vty(void)
 	install_element(BGP_VPNV4_NODE, &vtysh_quit_bgpd_cmd);
 	install_element(BGP_VPNV4_NODE, &vtysh_end_all_cmd);
 	install_element(BGP_VPNV4_NODE, &exit_address_family_cmd);
+
+	install_node(&bgp_vpnv4_srv6_node);
+	install_element(BGP_VPNV4_NODE, &bgp_segment_routing_srv6_cmd);
+	install_element(BGP_VPNV4_SRV6_NODE, &vtysh_exit_bgpd_cmd);
+	install_element(BGP_VPNV4_SRV6_NODE, &vtysh_quit_bgpd_cmd);
+	install_element(BGP_VPNV4_SRV6_NODE, &vtysh_end_all_cmd);
 
 	install_node(&bgp_vpnv6_node);
 	install_element(BGP_NODE, &address_family_ipv6_vpn_cmd);
