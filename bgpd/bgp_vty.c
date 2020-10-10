@@ -8499,6 +8499,34 @@ DEFUN_NOSH (bgp_segment_routing_srv6,
 	return CMD_SUCCESS;
 }
 
+DEFUN (vpnv4_srv6_locator,
+       vpnv4_srv6_locator_cmd,
+       "locator NAME",
+       "SRv6 locator\n"
+       "SRv6 locator name\n")
+{
+	VTY_DECLVAR_CONTEXT(bgp, bgp);
+
+	const char *name = argv[1]->arg;
+	snprintf(bgp->vpn_policy[AFI_IP].srv6.locator,
+		 SRV6_LOCNAME_SIZE, "%s", name);
+	return CMD_SUCCESS;
+}
+
+DEFUN (no_vpnv4_srv6_locator,
+       no_vpnv4_srv6_locator_cmd,
+       "no locator",
+       NO_STR
+       "SRv6 locator\n")
+{
+	VTY_DECLVAR_CONTEXT(bgp, bgp);
+
+	memset(bgp->vpn_policy[AFI_IP].srv6.locator,
+	       0, SRV6_LOCNAME_SIZE);
+	return CMD_SUCCESS;
+}
+
+
 /* Recalculate bestpath and re-advertise a prefix */
 static int bgp_clear_prefix(struct vty *vty, const char *view_name,
 			    const char *ip_str, afi_t afi, safi_t safi,
@@ -15627,6 +15655,15 @@ static void bgp_config_write_family(struct vty *vty, struct bgp *bgp, afi_t afi,
 		}
 	}
 
+	if (afi == AFI_IP && safi == SAFI_MPLS_VPN) {
+		const char *locator_name = bgp->vpn_policy[AFI_IP].srv6.locator;
+		if (strlen(locator_name) > 0) {
+			vty_frame(vty, "  segment-routing srv6\n");
+			vty_out(vty, "   locator %s\n", locator_name);
+			vty_endframe(vty, "  !\n");
+		}
+	}
+
 	vty_endframe(vty, " exit-address-family\n");
 }
 
@@ -17465,6 +17502,8 @@ void bgp_vty_init(void)
 
 	/* vpn with srv6 backend */
 	install_element(BGP_VPNV4_NODE, &bgp_segment_routing_srv6_cmd);
+	install_element(BGP_VPNV4_SRV6_NODE, &vpnv4_srv6_locator_cmd);
+	install_element(BGP_VPNV4_SRV6_NODE, &no_vpnv4_srv6_locator_cmd);
 }
 
 #include "memory.h"
