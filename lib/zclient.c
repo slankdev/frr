@@ -2709,7 +2709,7 @@ stream_failure:
 }
 
 /**
- * Function to request a srv6-locator chunk in a syncronous way
+ * Function to request a srv6-locator chunk in an Asyncronous way
  *
  * It first writes the request to zclient output buffer and then
  * immediately reads the answer from the input buffer.
@@ -2721,7 +2721,34 @@ stream_failure:
 int srv6_manager_get_locator_chunk(struct zclient *zclient,
 				   const char *locator_name)
 {
-	return 0;
+	struct stream *s;
+	const size_t len = strlen(locator_name);
+
+	if (zclient_debug)
+		zlog_debug("Getting SRv6-Locator Chunk %s", locator_name);
+
+	if (zclient->sock < 0)
+		return -1;
+
+	/* send request */
+	s = zclient->obuf;
+	stream_reset(s);
+	zclient_create_header(s, ZEBRA_GET_SRV6_LOCATOR_CHUNK, VRF_DEFAULT);
+
+	/* proto */
+	stream_putc(s, zclient->redist_default);
+
+	/* instance */
+	stream_putw(s, zclient->instance);
+
+	/* locator_name */
+	stream_putw(s, len);
+	stream_put(s, locator_name, len);
+
+	/* Put length at the first point of the stream. */
+	stream_putw_at(s, 0, stream_get_endp(s));
+
+	return zclient_send_message(zclient);
 }
 
 /**
@@ -2734,7 +2761,34 @@ int srv6_manager_get_locator_chunk(struct zclient *zclient,
 int srv6_manager_release_locator_chunk(struct zclient *zclient,
 				       const char *locator_name)
 {
-	return 0;
+	struct stream *s;
+	const size_t len = strlen(locator_name);
+
+	if (zclient_debug)
+		zlog_debug("Releasing SRv6-Locator Chunk %s", locator_name);
+
+	if (zclient->sock < 0)
+		return -1;
+
+	/* send request */
+	s = zclient->obuf;
+	stream_reset(s);
+	zclient_create_header(s, ZEBRA_RELEASE_SRV6_LOCATOR_CHUNK, VRF_DEFAULT);
+
+	/* proto */
+	stream_putc(s, zclient->redist_default);
+
+	/* instance */
+	stream_putw(s, zclient->instance);
+
+	/* locator_name */
+	stream_putw(s, len);
+	stream_put(s, locator_name, len);
+
+	/* Put length at the first point of the stream. */
+	stream_putw_at(s, 0, stream_get_endp(s));
+
+	return zclient_send_message(zclient);
 }
 
 /*
