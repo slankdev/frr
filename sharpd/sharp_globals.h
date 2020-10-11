@@ -22,6 +22,8 @@
 #ifndef __SHARP_GLOBAL_H__
 #define __SHARP_GLOBAL_H__
 
+#include "lib/srv6.h"
+
 DECLARE_MGROUP(SHARPD)
 
 struct sharp_routes {
@@ -50,12 +52,23 @@ struct sharp_routes {
 	struct timeval t_end;
 };
 
+struct sharp_srv6_locator {
+	/* name of locator */
+	char name[SRV6_LOCNAME_SIZE];
+
+	/* list of struct prefix_ipv6 */
+	struct list *chunks;
+};
+
 struct sharp_global {
 	/* Global data about route install/deletions */
 	struct sharp_routes r;
 
 	/* The list of nexthops that we are watching and data about them */
 	struct list *nhs;
+
+	/* list of sharp_srv6_locator */
+	struct list *srv6_locators;
 };
 
 extern struct sharp_global sg;
