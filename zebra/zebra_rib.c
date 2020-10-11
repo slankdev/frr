@@ -2778,6 +2778,7 @@ void _route_entry_dump(const char *func, union prefixconstptr pp,
 		       union prefixconstptr src_pp,
 		       const struct route_entry *re)
 {
+	marker_debug_msg("call");
 	const struct prefix *src_p = src_pp.p;
 	bool is_srcdst = src_p && src_p->prefixlen;
 	char straddr[PREFIX_STRLEN];
@@ -2933,6 +2934,7 @@ int rib_add_multipath_nhe(afi_t afi, safi_t safi, struct prefix *p,
 			  struct prefix_ipv6 *src_p, struct route_entry *re,
 			  struct nhg_hash_entry *re_nhe)
 {
+	marker_debug_msg("call");
 	struct nhg_hash_entry *nhe = NULL;
 	struct route_table *table;
 	struct route_node *rn;
@@ -3050,6 +3052,7 @@ int rib_add_multipath(afi_t afi, safi_t safi, struct prefix *p,
 		      struct prefix_ipv6 *src_p, struct route_entry *re,
 		      struct nexthop_group *ng)
 {
+	marker_debug_msg("call");
 	int ret;
 	struct nhg_hash_entry nhe;
 

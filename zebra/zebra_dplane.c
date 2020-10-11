@@ -1827,6 +1827,7 @@ static int dplane_ctx_ns_init(struct zebra_dplane_ctx *ctx,
 int dplane_ctx_route_init(struct zebra_dplane_ctx *ctx, enum dplane_op_e op,
 			  struct route_node *rn, struct route_entry *re)
 {
+	marker_debug_msg("call");
 	int ret = EINVAL;
 	const struct route_table *table = NULL;
 	const struct rib_table_info *info;
@@ -2310,6 +2311,8 @@ dplane_route_update_internal(struct route_node *rn,
 			     struct route_entry *old_re,
 			     enum dplane_op_e op)
 {
+	marker_debug_msg("call");
+
 	enum zebra_dplane_result result = ZEBRA_DPLANE_REQUEST_FAILURE;
 	int ret = EINVAL;
 	struct zebra_dplane_ctx *ctx = NULL;
@@ -2515,6 +2518,7 @@ done:
 enum zebra_dplane_result dplane_sys_route_add(struct route_node *rn,
 					      struct route_entry *re)
 {
+	marker_debug_msg("call");
 	enum zebra_dplane_result ret = ZEBRA_DPLANE_REQUEST_FAILURE;
 
 	/* Ignore this event unless a provider plugin has requested it. */

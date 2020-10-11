@@ -38,6 +38,7 @@
 
 #include "mlag.h"
 #include "srte.h"
+#include "srv6.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -212,6 +213,14 @@ typedef enum {
 	ZEBRA_NHG_ADD,
 	ZEBRA_NHG_DEL,
 	ZEBRA_NHG_NOTIFY_OWNER,
+	ZEBRA_SRV6_LOCATOR_ADD,
+	ZEBRA_SRV6_LOCATOR_DELETE,
+	ZEBRA_SRV6_FUNCTION_ADD,
+	ZEBRA_SRV6_FUNCTION_DELETE,
+	ZEBRA_SRV6_MANAGER_CONNECT,
+	ZEBRA_SRV6_MANAGER_CONNECT_ASYNC,
+	ZEBRA_SRV6_MANAGER_GET_LOCATOR_CHUNK,
+	ZEBRA_SRV6_MANAGER_RELEASE_LOCATOR_CHUNK,
 	ZEBRA_ERROR,
 	ZEBRA_CLIENT_CAPABILITIES,
 	ZEBRA_OPAQUE_MESSAGE,
@@ -358,6 +367,11 @@ struct zclient {
 	int (*mlag_process_down)(void);
 	int (*mlag_handle_msg)(struct stream *msg, int len);
 	int (*nhg_notify_owner)(ZAPI_CALLBACK_ARGS);
+	int (*srv6_locator_add)(ZAPI_CALLBACK_ARGS);
+	int (*srv6_locator_delete)(ZAPI_CALLBACK_ARGS);
+	int (*srv6_function_add)(ZAPI_CALLBACK_ARGS);
+	int (*srv6_function_delete)(ZAPI_CALLBACK_ARGS);
+	void (*process_srv6_locator_chunk)(ZAPI_CALLBACK_ARGS);
 	int (*handle_error)(enum zebra_error_types error);
 	int (*opaque_msg_handler)(ZAPI_CALLBACK_ARGS);
 	int (*opaque_register_handler)(ZAPI_CALLBACK_ARGS);
@@ -425,6 +439,10 @@ struct zapi_nexthop {
 
 	/* SR-TE color. */
 	uint32_t srte_color;
+
+	/* SRv6 localsid info for Endpoint-behaviour */
+	uint32_t seg6local_action;
+	struct seg6local_context seg6local_ctx;
 };
 
 /*
@@ -513,6 +531,16 @@ struct zapi_route {
  * offload situation.
  */
 #define ZEBRA_FLAG_OFFLOADED          0x100
+/*
+ * This flag tells Zebra that the route is a seg6 route and should
+ * be treated specially.
+ */
+#define ZEBRA_FLAG_SEG6_ROUTE         0x200
+/*
+ * This flag tells Zebra that the route is a seg6local route and
+ * should be treated specially.
+ */
+#define ZEBRA_FLAG_SEG6LOCAL_ROUTE    0x400
 
 	/* The older XXX_MESSAGE flags live here */
 	uint32_t message;
@@ -870,6 +898,11 @@ extern int tm_get_table_chunk(struct zclient *zclient, uint32_t chunk_size,
 			      uint32_t *start, uint32_t *end);
 extern int tm_release_table_chunk(struct zclient *zclient, uint32_t start,
 				  uint32_t end);
+extern int srv6_manager_connect(struct zclient *zclient);
+extern int srv6_manager_get_locator_chunk(struct zclient *zclient,
+					  const char *locator_name);
+extern int srv6_manager_release_locator_chunk(struct zclient *zclient,
+					      const char *locator_name);
 
 extern int zebra_send_sr_policy(struct zclient *zclient, int cmd,
 				struct zapi_sr_policy *zp);
@@ -912,11 +945,21 @@ bool zapi_ipset_notify_decode(struct stream *s,
 			      uint32_t *unique,
 			     enum zapi_ipset_notify_owner *note);
 
-
 extern int zapi_nhg_encode(struct stream *s, int cmd, struct zapi_nhg *api_nhg);
 extern int zapi_nhg_decode(struct stream *s, int cmd, struct zapi_nhg *api_nhg);
 extern int zclient_nhg_send(struct zclient *zclient, int cmd,
 			    struct zapi_nhg *api_nhg);
+
+extern int zapi_srv6_locator_encode(uint8_t cmd, struct stream *s,
+				    const struct srv6_locator *locator);
+extern int zapi_srv6_locator_decode(struct stream *s,
+				    struct srv6_locator *locator);
+extern int zapi_srv6_function_encode(uint8_t cmd, struct stream *s,
+				     const struct srv6_function *function);
+extern int zapi_srv6_function_decode(struct stream *s,
+				     struct srv6_function *function);
+extern int zclient_send_srv6_function(struct zclient *zclient,
+				      const struct srv6_function *function);
 
 #define ZEBRA_IPSET_NAME_SIZE   32
 
