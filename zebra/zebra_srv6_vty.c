@@ -153,6 +153,42 @@ DEFUN (show_srv6_sid,
 	return CMD_SUCCESS;
 }
 
+DEFUN (show_srv6_manager,
+       show_srv6_manager_cmd,
+       "show segment-routing srv6 manager",
+       SHOW_STR
+       "Segment Routing\n"
+       "Segment Routing SRv6\n"
+       "SRv6 Manager Information\n")
+{
+	struct zebra_srv6 *srv6 = zebra_srv6_get_default();
+	struct srv6_locator *locator;
+	struct listnode *node;
+	char str[256];
+
+	vty_out(vty, "\n");
+	vty_out(vty, "Locators:\n");
+	for (ALL_LIST_ELEMENTS_RO(srv6->locators, node, locator)) {
+		prefix2str(&locator->prefix, str, sizeof(str));
+
+		vty_out(vty, "- Name: %s\n", locator->name);
+		vty_out(vty, "  Prefix: %s\n", str);
+		vty_out(vty, "  Chunks:\n");
+
+		struct listnode *subnode;
+		struct srv6_locator_chunk *chunk;
+		for (ALL_LIST_ELEMENTS_RO((struct list *)locator->chunks, subnode, chunk)) {
+			prefix2str(&chunk->prefix, str, sizeof(str));
+			vty_out(vty, "  - Prefix: %s\n", str);
+			vty_out(vty, "    Owner: %s\n", zebra_route_string(chunk->owner_proto));
+		}
+
+	}
+	vty_out(vty, "\n");
+
+	return CMD_SUCCESS;
+}
+
 DEFUN (show_srv6_locator,
        show_srv6_locator_cmd,
        "show segment-routing srv6 locator [json]",
@@ -197,8 +233,9 @@ DEFUN (show_srv6_locator,
 		id = 1;
 		for (ALL_LIST_ELEMENTS_RO(srv6->locators, node, locator)) {
 			prefix2str(&locator->prefix, str, sizeof(str));
-			vty_out(vty, "%-20s %7d %-24s Up\n",
-				locator->name, id, str);
+			vty_out(vty, "%-20s %7d %-24s %s\n",
+				locator->name, id, str,
+				locator->status_up ? "Up" : "Down");
 			++id;
 		}
 		vty_out(vty, "\n");
@@ -235,12 +272,18 @@ DEFUN (show_srv6_locator_detail,
 
 			prefix2str(&locator->prefix, str, sizeof(str));
 			vty_out(vty, "Name: %s\n", locator->name);
-			vty_out(vty, "Owner: %u(%s)\n",
-				locator->owner_proto,
-				zebra_route_string(locator->owner_proto));
 			vty_out(vty, "Prefix: %s\n", str);
-			vty_out(vty, "Function Bit-len: %u\n",
+			vty_out(vty, "Function-Bit-Len: %u\n",
 				locator->function_bits_length);
+
+			vty_out(vty, "Chunks:\n");
+			struct listnode *node;
+			struct srv6_locator_chunk *chunk;
+			for (ALL_LIST_ELEMENTS_RO((struct list *)locator->chunks, node, chunk)) {
+				prefix2str(&chunk->prefix, str, sizeof(str));
+				vty_out(vty, "- prefix: %s, owner: %s\n", str,
+					zebra_route_string(chunk->owner_proto));
+			}
 		}
 
 	}
@@ -286,6 +329,7 @@ DEFUN_NOSH (srv6_locator,
 	locator = zebra_srv6_locator_lookup(argv[1]->arg);
 	if (locator) {
 		VTY_PUSH_CONTEXT(SRV6_LOC_NODE, locator);
+		locator->status_up = true;
 		return CMD_SUCCESS;
 	}
 
@@ -294,6 +338,7 @@ DEFUN_NOSH (srv6_locator,
 		vty_out(vty, "%% Alloc failed\n");
 		return CMD_WARNING_CONFIG_FAILED;
 	}
+	locator->status_up = true;
 
 	VTY_PUSH_CONTEXT(SRV6_LOC_NODE, locator);
 	vty->node = SRV6_LOC_NODE;
@@ -310,6 +355,8 @@ DEFUN (locator_prefix,
 {
 	VTY_DECLVAR_CONTEXT(srv6_locator, locator);
 	struct prefix_ipv6 prefix;
+	struct srv6_locator_chunk *chunk = NULL;
+	struct listnode *node = NULL;
 	uint8_t function_bits_length = 16;
 	int ret;
 
@@ -325,6 +372,20 @@ DEFUN (locator_prefix,
 
 	locator->prefix = prefix;
 	locator->function_bits_length = function_bits_length;
+
+	if (list_isempty(locator->chunks)) {
+		chunk = srv6_locator_chunk_alloc();
+		chunk->prefix = prefix;
+		chunk->owner_proto = 0;
+		listnode_add(locator->chunks, chunk);
+	} else {
+		for (ALL_LIST_ELEMENTS_RO(locator->chunks, node, chunk)) {
+			uint8_t zero[16] = {0};
+			if (memcmp(&chunk->prefix.prefix, zero, 16) == 0)
+				chunk->prefix = prefix;
+		}
+	}
+
 	zebra_srv6_locator_add(locator);
 	return CMD_SUCCESS;
 }
@@ -378,6 +439,7 @@ void zebra_srv6_vty_init(void)
 	install_element(SRV6_LOC_NODE, &locator_prefix_cmd);
 
 	/* Command for operation */
+	install_element(VIEW_NODE, &show_srv6_manager_cmd);
 	install_element(VIEW_NODE, &show_srv6_sid_cmd);
 	install_element(VIEW_NODE, &show_srv6_locator_cmd);
 	install_element(VIEW_NODE, &show_srv6_locator_detail_cmd);

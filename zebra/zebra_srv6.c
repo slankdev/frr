@@ -395,37 +395,44 @@ assign_srv6_locator_chunk(uint8_t proto,
 {
 	marker_debug_msg("call");
 
+	bool chunk_found = false;
+	struct listnode *node = NULL;
 	struct srv6_locator *loc = NULL;
+	struct srv6_locator_chunk *chunk = NULL;
+
 	loc = zebra_srv6_locator_lookup(locator_name);
 	if (!loc) {
 		zlog_info("%s: locator %s was not found",
 			  __func__, locator_name);
+
+		loc = srv6_locator_alloc(locator_name);
+		if (!loc) {
+			zlog_info("%s: locator %s can't allocated",
+				  __func__, locator_name);
+			return NULL;
+		}
+
+		loc->status_up = false;
+		chunk = srv6_locator_chunk_alloc();
+		chunk->owner_proto = 0;
+		listnode_add(loc->chunks, chunk);
+		zebra_srv6_locator_add(loc);
+	}
+
+	for (ALL_LIST_ELEMENTS_RO((struct list *)loc->chunks, node, chunk)) {
+		if (chunk->owner_proto != 0 && chunk->owner_proto != proto)
+			continue;
+		chunk_found = true;
+		break;
+	}
+
+	if (!chunk_found) {
+		zlog_info("%s: locator is already owned", __func__);
 		return NULL;
 	}
 
-	if (loc->owner_proto != 0 && loc->owner_proto != proto) {
-		zlog_info("%s: locator is already owned by proto(%u)",
-			  __func__, loc->owner_proto);
-		return NULL;
-	}
-
-	loc->owner_proto = proto;
+	chunk->owner_proto = proto;
 	return loc;
-}
-
-static int
-zebra_srv6_manager_get_locator_chunk_response(struct srv6_locator *loc,
-					      struct zserv *client,
-					      vrf_id_t vrf_id)
-{
-	if (!loc)
-		zlog_err("Unable to assign SRv6 locator chunk to %s instance %u",
-			 zebra_route_string(client->proto), client->instance);
-	else if (IS_ZEBRA_DEBUG_PACKET)
-		zlog_info("Assigned SRv6 locator chunk %s to %s instance %u",
-			  loc->name, zebra_route_string(client->proto),
-			  client->instance);
-	return zsend_srv6_manager_get_locator_chunk_response(client, vrf_id, loc);
 }
 
 static int
@@ -437,7 +444,16 @@ zebra_srv6_manager_get_locator_chunk(struct srv6_locator **loc,
 	marker_debug_msg("call");
 	*loc = assign_srv6_locator_chunk(client->proto, client->instance,
 					 client->session_id, locator_name);
-	return zebra_srv6_manager_get_locator_chunk_response(*loc, client, vrf_id);
+
+	if (!*loc)
+		zlog_err("Unable to assign SRv6 locator chunk to %s instance %u",
+			 zebra_route_string(client->proto), client->instance);
+	else if (IS_ZEBRA_DEBUG_PACKET)
+		zlog_info("Assigned SRv6 locator chunk %s to %s instance %u",
+			  (*loc)->name, zebra_route_string(client->proto),
+			  client->instance);
+
+	return zsend_srv6_manager_get_locator_chunk_response(client, vrf_id, *loc);
 }
 
 static int zebra_srv6_manager_release_locator_chunk(struct zserv *client,
@@ -445,7 +461,26 @@ static int zebra_srv6_manager_release_locator_chunk(struct zserv *client,
 						    vrf_id_t vrf_id)
 {
 	marker_debug_msg("call");
-	// TODO(slankdev):
+
+	struct srv6_locator *loc = NULL;
+	loc = zebra_srv6_locator_lookup(locator_name);
+	if (!loc) {
+		return -1;
+	}
+
+	struct listnode *node;
+	struct srv6_locator_chunk *chunk;
+	for (ALL_LIST_ELEMENTS_RO((struct list *)loc->chunks, node, chunk)) {
+		if (chunk->owner_proto != client->proto)
+			continue;
+		chunk->owner_proto = 0;
+	}
+
+	if (IS_ZEBRA_DEBUG_PACKET)
+		zlog_info("Released SRv6 locator chunk %s to %s instance %u",
+			  loc->name, zebra_route_string(client->proto),
+			  client->instance);
+
 	return 0;
 }
 
