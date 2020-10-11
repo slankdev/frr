@@ -2896,6 +2896,15 @@ static void bgp_zebra_process_srv6_locator_chunk(ZAPI_CALLBACK_ARGS)
 	STREAM_GETW(s, chunk->prefixlen);
 	STREAM_GET(&chunk->prefix, s, 16);
 
+	if (zclient->redist_default != proto) {
+		zlog_err("Got SRv6 Manager msg with wrong proto %u", proto);
+		return;
+	}
+	if (zclient->instance != instance) {
+		zlog_err("Got SRv6 Manager msg with wrong instance %u", proto);
+		return;
+	}
+
 	bgp = bgp_get_default();
 	if (!bgp->vpn_policy[AFI_IP].srv6.locator_chunk)
 		bgp->vpn_policy[AFI_IP].srv6.locator_chunk = list_new();
