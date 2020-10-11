@@ -395,18 +395,30 @@ assign_srv6_locator_chunk(uint8_t proto,
 {
 	marker_debug_msg("call");
 
+	bool chunk_found = false;
+	struct listnode *node = NULL;
 	struct srv6_locator *loc = NULL;
+	struct srv6_locator_chunk *chunk = NULL;
+
 	loc = zebra_srv6_locator_lookup(locator_name);
 	if (!loc) {
 		zlog_info("%s: locator %s was not found",
 			  __func__, locator_name);
-		// TODO(slankdev): allocate dummy locator and set status down.
-		return NULL;
+
+		loc = srv6_locator_alloc(locator_name);
+		if (!loc) {
+			zlog_info("%s: locator %s can't allocated",
+				  __func__, locator_name);
+			return NULL;
+		}
+
+		loc->status_up = false;
+		chunk = srv6_locator_chunk_alloc();
+		chunk->owner_proto = 0;
+		listnode_add(loc->chunks, chunk);
+		zebra_srv6_locator_add(loc);
 	}
 
-	bool chunk_found = false;
-	struct listnode *node;
-	struct srv6_locator_chunk *chunk;
 	for (ALL_LIST_ELEMENTS_RO((struct list *)loc->chunks, node, chunk)) {
 		if (chunk->owner_proto != 0 && chunk->owner_proto != proto)
 			continue;

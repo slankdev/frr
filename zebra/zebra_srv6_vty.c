@@ -329,6 +329,7 @@ DEFUN_NOSH (srv6_locator,
 	locator = zebra_srv6_locator_lookup(argv[1]->arg);
 	if (locator) {
 		VTY_PUSH_CONTEXT(SRV6_LOC_NODE, locator);
+		locator->status_up = true;
 		return CMD_SUCCESS;
 	}
 
@@ -355,6 +356,7 @@ DEFUN (locator_prefix,
 	VTY_DECLVAR_CONTEXT(srv6_locator, locator);
 	struct prefix_ipv6 prefix;
 	struct srv6_locator_chunk *chunk = NULL;
+	struct listnode *node = NULL;
 	uint8_t function_bits_length = 16;
 	int ret;
 
@@ -371,10 +373,18 @@ DEFUN (locator_prefix,
 	locator->prefix = prefix;
 	locator->function_bits_length = function_bits_length;
 
-	chunk = srv6_locator_chunk_alloc();
-	chunk->prefix = prefix;
-	chunk->owner_proto = 0;
-	listnode_add(locator->chunks, chunk);
+	if (list_isempty(locator->chunks)) {
+		chunk = srv6_locator_chunk_alloc();
+		chunk->prefix = prefix;
+		chunk->owner_proto = 0;
+		listnode_add(locator->chunks, chunk);
+	} else {
+		for (ALL_LIST_ELEMENTS_RO(locator->chunks, node, chunk)) {
+			uint8_t zero[16] = {0};
+			if (memcmp(&chunk->prefix.prefix, zero, 16) == 0)
+				chunk->prefix = prefix;
+		}
+	}
 
 	zebra_srv6_locator_add(locator);
 	return CMD_SUCCESS;
