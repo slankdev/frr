@@ -233,8 +233,9 @@ DEFUN (show_srv6_locator,
 		id = 1;
 		for (ALL_LIST_ELEMENTS_RO(srv6->locators, node, locator)) {
 			prefix2str(&locator->prefix, str, sizeof(str));
-			vty_out(vty, "%-20s %7d %-24s Up\n",
-				locator->name, id, str);
+			vty_out(vty, "%-20s %7d %-24s %s\n",
+				locator->name, id, str,
+				locator->status_up ? "Up" : "Down");
 			++id;
 		}
 		vty_out(vty, "\n");
@@ -336,6 +337,7 @@ DEFUN_NOSH (srv6_locator,
 		vty_out(vty, "%% Alloc failed\n");
 		return CMD_WARNING_CONFIG_FAILED;
 	}
+	locator->status_up = true;
 
 	VTY_PUSH_CONTEXT(SRV6_LOC_NODE, locator);
 	vty->node = SRV6_LOC_NODE;
