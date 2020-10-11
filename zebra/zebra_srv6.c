@@ -373,13 +373,55 @@ struct zebra_srv6 *zebra_srv6_get_default(void)
 	return &srv6;
 }
 
-static int zebra_srv6_manager_get_locator_chunk(struct srv6_locator **loc,
-					  struct zserv *client,
-					  const char *locator_name,
-					  vrf_id_t vrf_id)
+/**
+ * Core function, assigns srv6-locator chunks
+ *
+ * It first searches through the list to check if there's one available
+ * (previously released). Otherwise it creates and assigns a new one
+ *
+ * @param proto Daemon protocol of client, to identify the owner
+ * @param instance Instance, to identify the owner
+ * @param session_id SessionID of client
+ * @param name Name of SRv6-locator
+ * @return Pointer to the assigned srv6-locator chunk,
+ *         or NULL if the request could not be satisfied
+ */
+static struct srv6_locator *
+assign_srv6_locator_chunk(uint8_t proto,
+			  uint16_t instance,
+			  uint32_t session_id,
+			  const char *locator_name)
 {
 	marker_debug_msg("call");
-	// TODO(slankdev):
+
+	struct srv6_locator *loc = NULL;
+	loc = zebra_srv6_locator_lookup(locator_name);
+	if (!loc) {
+		zlog_info("%s: locator %s was not found",
+			  __func__, locator_name);
+		return NULL;
+	}
+
+	if (loc->owner_proto != 0 && loc->owner_proto != proto) {
+		zlog_info("%s: locator is already owned by proto(%u)",
+			  __func__, loc->owner_proto);
+		return NULL;
+	}
+
+	loc->owner_proto = proto;
+	return loc;
+}
+
+static int
+zebra_srv6_manager_get_locator_chunk(struct srv6_locator **loc,
+				     struct zserv *client,
+				     const char *locator_name,
+				     vrf_id_t vrf_id)
+{
+	marker_debug_msg("call");
+	*loc = assign_srv6_locator_chunk(client->proto, client->instance,
+					 client->session_id, locator_name);
+	//return srv6_manager_get_locator_chunk_response(*loc, client, vrf_id);
 	return 0;
 }
 

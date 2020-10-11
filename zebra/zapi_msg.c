@@ -2899,7 +2899,7 @@ static void zread_srv6_manager_get_locator_chunk(struct zserv *client,
 	uint8_t proto;
 	uint16_t instance;
 	uint16_t len;
-	char locator_name[SRV6_LOCNAME_SIZE];
+	char locator_name[SRV6_LOCNAME_SIZE] = {0};
 
 	/* Get data. */
 	STREAM_GETC(s, proto);

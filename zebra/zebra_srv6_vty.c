@@ -235,7 +235,12 @@ DEFUN (show_srv6_locator_detail,
 
 			prefix2str(&locator->prefix, str, sizeof(str));
 			vty_out(vty, "Name: %s\n", locator->name);
+			vty_out(vty, "Owner: %u(%s)\n",
+				locator->owner_proto,
+				zebra_route_string(locator->owner_proto));
 			vty_out(vty, "Prefix: %s\n", str);
+			vty_out(vty, "Function Bit-len: %u\n",
+				locator->function_bits_length);
 		}
 
 	}
