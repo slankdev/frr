@@ -4088,7 +4088,6 @@ static int zclient_read(struct thread *thread)
 							 length, vrf_id);
 		break;
 	case ZEBRA_SRV6_MANAGER_GET_LOCATOR_CHUNK:
-		marker_debug_msg("LOCATOR_CHUNK!!!!!");
 		if (zclient->process_srv6_locator_chunk)
 			(*zclient->process_srv6_locator_chunk)(command, zclient,
 						       length, vrf_id);
