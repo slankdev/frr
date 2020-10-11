@@ -771,6 +771,7 @@ static void sharp_zebra_process_srv6_locator_chunk(ZAPI_CALLBACK_ARGS)
 	uint16_t len;
 	char name[256] = {0};
 	struct prefix_ipv6 *chunk = NULL;
+	chunk = prefix_ipv6_new();
 
 	s = zclient->ibuf;
 	STREAM_GETC(s, proto);
@@ -779,7 +780,6 @@ static void sharp_zebra_process_srv6_locator_chunk(ZAPI_CALLBACK_ARGS)
 	STREAM_GETW(s, len);
 	STREAM_GET(name, s, len);
 
-	chunk = prefix_ipv6_new();
 	STREAM_GETW(s, chunk->prefixlen);
 	STREAM_GET(&chunk->prefix, s, 16);
 
@@ -797,6 +797,8 @@ static void sharp_zebra_process_srv6_locator_chunk(ZAPI_CALLBACK_ARGS)
 
 stream_failure:
 	free(chunk);
+
+	zlog_err("%s: can't get locator_chunk!!", __func__);
 	return;
 }
 
