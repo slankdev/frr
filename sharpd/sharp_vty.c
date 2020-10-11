@@ -693,6 +693,64 @@ DEFPY (neigh_discover,
 	return CMD_SUCCESS;
 }
 
+DEFPY (sharp_srv6_manager_get_locator_chunk,
+       sharp_srv6_manager_get_locator_chunk_cmd,
+       "sharp srv6-manager get-locator-chunk NAME$locator_name",
+       SHARP_STR
+       "Segment-Routing IPv6\n"
+       "Get SRv6 locator-chunk\n"
+       "SRv6 Locator name\n")
+{
+	int ret;
+	memset(sg.srv6_locator_name, 0, SRV6_LOCNAME_SIZE);
+	snprintf(sg.srv6_locator_name, SRV6_LOCNAME_SIZE,
+		 "%s", locator_name);
+
+	ret = sharp_zebra_srv6_manager_get_locator_chunk(locator_name);
+	if (ret < 0)
+		return CMD_WARNING_CONFIG_FAILED;
+
+	return CMD_SUCCESS;
+}
+
+DEFPY (sharp_srv6_manager_release_locator_chunk,
+       sharp_srv6_manager_release_locator_chunk_cmd,
+       "sharp srv6-manager release-locator-chunk NAME$locator_name",
+       SHARP_STR
+       "Segment-Routing IPv6\n"
+       "Release SRv6 locator-chunk\n"
+       "SRv6 Locator name\n")
+{
+	int ret;
+	memset(sg.srv6_locator_name, 0, SRV6_LOCNAME_SIZE);
+	ret = sharp_zebra_srv6_manager_release_locator_chunk(locator_name);
+	if (ret < 0)
+		return CMD_WARNING_CONFIG_FAILED;
+
+	return CMD_SUCCESS;
+}
+
+DEFPY (show_sharp_segment_routing_srv6,
+       show_sharp_segment_routing_srv6_cmd,
+       "show sharp segment-routing srv6",
+       SHOW_STR
+       SHARP_STR
+       "Segment-Routing\n"
+       "Segment-Routing IPv6\n")
+{
+	vty_out(vty, "LocatorName: %s\n", sg.srv6_locator_name);
+	vty_out(vty, "LocatorChunks:\n");
+
+	char str[256];
+	struct listnode *node;
+	struct prefix_ipv6 *chunk;
+	for (ALL_LIST_ELEMENTS_RO((struct list *)sg.srv6_locator_chunks, node, chunk)) {
+		prefix2str(chunk, str, sizeof(str));
+		vty_out(vty, "- %s\n", str);
+	}
+	return CMD_SUCCESS;
+}
+
 void sharp_vty_init(void)
 {
 	install_element(ENABLE_NODE, &install_routes_data_dump_cmd);
@@ -713,6 +771,10 @@ void sharp_vty_init(void)
 	install_element(ENABLE_NODE, &neigh_discover_cmd);
 
 	install_element(ENABLE_NODE, &show_debugging_sharpd_cmd);
+
+	install_element(ENABLE_NODE, &sharp_srv6_manager_get_locator_chunk_cmd);
+	install_element(ENABLE_NODE, &sharp_srv6_manager_release_locator_chunk_cmd);
+	install_element(ENABLE_NODE, &show_sharp_segment_routing_srv6_cmd);
 
 	return;
 }
