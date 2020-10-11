@@ -316,6 +316,7 @@ DEFUN (locator_prefix,
 {
 	VTY_DECLVAR_CONTEXT(srv6_locator, locator);
 	struct prefix_ipv6 prefix;
+	struct srv6_locator_chunk *chunk = NULL;
 	uint8_t function_bits_length = 16;
 	int ret;
 
@@ -331,6 +332,12 @@ DEFUN (locator_prefix,
 
 	locator->prefix = prefix;
 	locator->function_bits_length = function_bits_length;
+
+	chunk = srv6_locator_chunk_alloc();
+	chunk->prefix = prefix;
+	chunk->owner_proto = 0;
+	listnode_add(locator->chunks, chunk);
+
 	zebra_srv6_locator_add(locator);
 	return CMD_SUCCESS;
 }
