@@ -400,16 +400,26 @@ assign_srv6_locator_chunk(uint8_t proto,
 	if (!loc) {
 		zlog_info("%s: locator %s was not found",
 			  __func__, locator_name);
+		// TODO(slankdev): allocate dummy locator and set status down.
 		return NULL;
 	}
 
-	if (loc->owner_proto != 0 && loc->owner_proto != proto) {
-		zlog_info("%s: locator is already owned by proto(%u)",
-			  __func__, loc->owner_proto);
+	bool chunk_found = false;
+	struct listnode *node;
+	struct srv6_locator_chunk *chunk;
+	for (ALL_LIST_ELEMENTS_RO((struct list *)loc->chunks, node, chunk)) {
+		if (chunk->owner_proto != 0 && chunk->owner_proto != proto)
+			continue;
+		chunk_found = true;
+		break;
+	}
+
+	if (!chunk_found) {
+		zlog_info("%s: locator is already owned", __func__);
 		return NULL;
 	}
 
-	loc->owner_proto = proto;
+	chunk->owner_proto = proto;
 	return loc;
 }
 

@@ -235,12 +235,18 @@ DEFUN (show_srv6_locator_detail,
 
 			prefix2str(&locator->prefix, str, sizeof(str));
 			vty_out(vty, "Name: %s\n", locator->name);
-			vty_out(vty, "Owner: %u(%s)\n",
-				locator->owner_proto,
-				zebra_route_string(locator->owner_proto));
 			vty_out(vty, "Prefix: %s\n", str);
-			vty_out(vty, "Function Bit-len: %u\n",
+			vty_out(vty, "Function-Bit-Len: %u\n",
 				locator->function_bits_length);
+
+			vty_out(vty, "Chunks:\n");
+			struct listnode *node;
+			struct srv6_locator_chunk *chunk;
+			for (ALL_LIST_ELEMENTS_RO((struct list *)locator->chunks, node, chunk)) {
+				prefix2str(&chunk->prefix, str, sizeof(str));
+				vty_out(vty, "- prefix: %s, owner: %s\n", str,
+					zebra_route_string(chunk->owner_proto));
+			}
 		}
 
 	}
