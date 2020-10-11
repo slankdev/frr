@@ -79,6 +79,7 @@ struct srv6_locator {
 	int algonum;
 	uint64_t current;
 	struct list *functions;
+	uint8_t owner_proto;
 
 	QOBJ_FIELDS
 };
