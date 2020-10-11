@@ -78,6 +78,7 @@ struct srv6_locator {
 	uint8_t function_bits_length;
 	int algonum;
 	uint64_t current;
+	bool status_up;
 	struct list *functions;
 	struct list *chunks;
 
