@@ -160,6 +160,58 @@ DEFPY (install_routes_data_dump,
 	return CMD_SUCCESS;
 }
 
+inline static enum seg6local_action_t
+parse_seg6local_action(const char *str)
+{
+	if (!strcmp(str, "End"))
+		return ZEBRA_SEG6_LOCAL_ACTION_END;
+	else if (!strcmp(str, "End_T"))
+		return ZEBRA_SEG6_LOCAL_ACTION_END_T;
+	else
+		return ZEBRA_SEG6_LOCAL_ACTION_UNSPEC;
+}
+
+DEFPY (install_seg6local_route,
+       install_seg6local_route_cmd,
+       "sharp install seg6local-route X:X::X:X/M$prefix6 action "\
+         "<"\
+	  "End|"\
+	  "End_T table (0-255)$end_t_table|"\
+	  "End_X nh6 X:X::X:X$end_x_nh6|"\
+	  "End_DX4 nh4 A.B.C.D$end_dx4_nh4"\
+	 ">",
+       "Sharp routing Protocol\n"
+       "install some routes\n"
+       "Seg6local Route to install\n"
+       "v6 Address to start /32 generation at\n"
+       "Action of SRv6 local function\n"
+       "End\n"
+       "End.T\n"
+       "End.T Table ID\n"
+       "End.T Table ID\n"
+       "End.X\n"
+       "End.X Nexthop6\n"
+       "End.X Nexthop6\n"
+       "End.DX4\n"
+       "End.DX4 Nexthop4\n"
+       "End.DX4 Nexthop4\n"
+       )
+{
+	char str[256];
+	const char *action_str = argv[5]->arg;
+	enum seg6local_action_t act;
+	struct seg6local_context ctx = {0};
+
+	prefix2str(prefix6, str, sizeof(str));
+	vty_out(vty, "prefix6: %s\n", str);
+	vty_out(vty, "action: %s\n", action_str);
+
+	// TODO(slankdev):
+	act = parse_seg6local_action(action_str);
+	sharp_install_seg6local_route_helper((struct prefix *)prefix6, 0, act, &ctx);
+	return CMD_SUCCESS;
+}
+
 DEFPY (install_routes,
        install_routes_cmd,
        "sharp install routes [vrf NAME$vrf_name]\
@@ -697,6 +749,63 @@ DEFPY (neigh_discover,
 	return CMD_SUCCESS;
 }
 
+DEFPY (sharp_srv6_manager_get_locator_chunk,
+       sharp_srv6_manager_get_locator_chunk_cmd,
+       "sharp srv6-manager get-locator-chunk NAME$locator_name",
+       SHARP_STR
+       "Segment-Routing IPv6\n"
+       "Get SRv6 locator-chunk\n"
+       "SRv6 Locator name\n")
+{
+	int ret;
+	memset(sg.srv6_locator_name, 0, SRV6_LOCNAME_SIZE);
+	snprintf(sg.srv6_locator_name, SRV6_LOCNAME_SIZE,
+		 "%s", locator_name);
+
+	ret = sharp_zebra_srv6_manager_get_locator_chunk(locator_name);
+	if (ret < 0)
+		return CMD_WARNING_CONFIG_FAILED;
+
+	return CMD_SUCCESS;
+}
+
+DEFPY (sharp_srv6_manager_release_locator_chunk,
+       sharp_srv6_manager_release_locator_chunk_cmd,
+       "sharp srv6-manager release-locator-chunk NAME$locator_name",
+       SHARP_STR
+       "Segment-Routing IPv6\n"
+       "Release SRv6 locator-chunk\n"
+       "SRv6 Locator name\n")
+{
+	int ret;
+	memset(sg.srv6_locator_name, 0, SRV6_LOCNAME_SIZE);
+	ret = sharp_zebra_srv6_manager_release_locator_chunk(locator_name);
+	if (ret < 0)
+		return CMD_WARNING_CONFIG_FAILED;
+
+	return CMD_SUCCESS;
+}
+
+DEFPY (show_sharp_segment_routing_srv6,
+       show_sharp_segment_routing_srv6_cmd,
+       "show sharp segment-routing srv6",
+       SHARP_STR
+       "Segment-Routing\n"
+       "Segment-Routing IPv6\n")
+{
+	vty_out(vty, "LocatorName: %s\n", sg.srv6_locator_name);
+	vty_out(vty, "LocatorChunks:\n");
+
+	char str[256];
+	struct listnode *node;
+	struct prefix_ipv6 *chunk;
+	for (ALL_LIST_ELEMENTS_RO((struct list *)sg.srv6_locator_chunks, node, chunk)) {
+		prefix2str(chunk, str, sizeof(str));
+		vty_out(vty, "- %s\n", str);
+	}
+	return CMD_SUCCESS;
+}
+
 void sharp_vty_init(void)
 {
 	install_element(ENABLE_NODE, &install_routes_data_dump_cmd);
@@ -715,6 +824,11 @@ void sharp_vty_init(void)
 	install_element(ENABLE_NODE, &send_opaque_unicast_cmd);
 	install_element(ENABLE_NODE, &send_opaque_reg_cmd);
 	install_element(ENABLE_NODE, &neigh_discover_cmd);
+
+	install_element(ENABLE_NODE, &sharp_srv6_manager_get_locator_chunk_cmd);
+	install_element(ENABLE_NODE, &sharp_srv6_manager_release_locator_chunk_cmd);
+	install_element(ENABLE_NODE, &show_sharp_segment_routing_srv6_cmd);
+	install_element(ENABLE_NODE, &install_seg6local_route_cmd);
 
 	install_element(VIEW_NODE, &show_debugging_sharpd_cmd);
 

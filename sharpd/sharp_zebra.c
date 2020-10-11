@@ -216,6 +216,43 @@ int sharp_install_lsps_helper(bool install_p, bool update_p,
 	return ret;
 }
 
+void sharp_install_seg6local_route_helper(struct prefix *p,
+					  uint8_t instance,
+					  enum seg6local_action_t act,
+					  struct seg6local_context *ctx)
+{
+	marker_debug_msg("call");
+
+	struct zapi_route api;
+	struct zapi_nexthop *api_nh;
+	//struct nexthop *nh;
+	//int i = 0;
+
+	memset(&api, 0, sizeof(api));
+	api.vrf_id = VRF_DEFAULT;
+	api.type = ZEBRA_ROUTE_SHARP;
+	api.instance = instance;
+	api.safi = SAFI_UNICAST;
+	memcpy(&api.prefix, p, sizeof(*p));
+
+	api.nexthop_num = 1;
+	SET_FLAG(api.flags, ZEBRA_FLAG_SEG6LOCAL_ROUTE);
+	SET_FLAG(api.message, ZAPI_MESSAGE_NEXTHOP);
+
+	api_nh = &api.nexthops[0];
+	api_nh->type = NEXTHOP_TYPE_IFINDEX;
+	api_nh->vrf_id = 0;
+	api_nh->ifindex = 4
+	//memcpy(&api_nh->gate.ipv6, nh6, 16);
+	api_nh->seg6local_action = act;
+	memcpy(&api_nh->seg6local_ctx, ctx, sizeof(*ctx));
+
+	marker_debug_msg("before");
+	zclient_route_send(ZEBRA_ROUTE_ADD, zclient, &api);
+	marker_debug_msg("after");
+	return;
+}
+
 void sharp_install_routes_helper(struct prefix *p, vrf_id_t vrf_id,
 				 uint8_t instance, uint32_t nhgid,
 				 const struct nexthop_group *nhg,
@@ -751,6 +788,57 @@ static int nhg_notify_owner(ZAPI_CALLBACK_ARGS)
 	return 0;
 }
 
+int sharp_zebra_srv6_manager_get_locator_chunk(const char* locator_name)
+{
+	return srv6_manager_get_locator_chunk(zclient, locator_name);
+}
+
+int sharp_zebra_srv6_manager_release_locator_chunk(const char *locator_name)
+{
+	return srv6_manager_release_locator_chunk(zclient, locator_name);
+}
+
+static void sharp_zebra_process_srv6_locator_chunk(ZAPI_CALLBACK_ARGS)
+{
+	marker_debug_msg("call");
+
+	struct stream *s = NULL;
+	uint8_t proto;
+	uint16_t instance;
+	uint16_t len;
+	char name[256] = {0};
+	struct prefix_ipv6 *chunk = NULL;
+	chunk = prefix_ipv6_new();
+
+	s = zclient->ibuf;
+	STREAM_GETC(s, proto);
+	STREAM_GETW(s, instance);
+
+	STREAM_GETW(s, len);
+	STREAM_GET(name, s, len);
+
+	STREAM_GETW(s, chunk->prefixlen);
+	STREAM_GET(&chunk->prefix, s, 16);
+
+	if (zclient->redist_default != proto) {
+		zlog_err("Got SRv6 Manager msg with wrong proto %u", proto);
+		return;
+	}
+	if (zclient->instance != instance) {
+		zlog_err("Got SRv6 Manager msg with wrong instance %u", proto);
+		return;
+	}
+
+	listnode_add(sg.srv6_locator_chunks, chunk);
+	return;
+
+stream_failure:
+	free(chunk);
+
+	zlog_err("%s: can't get locator_chunk!!", __func__);
+	return;
+}
+
 void sharp_zebra_init(void)
 {
 	struct zclient_options opt = {.receive_notify = true};
@@ -772,4 +860,6 @@ void sharp_zebra_init(void)
 	zclient->redistribute_route_add = sharp_redistribute_route;
 	zclient->redistribute_route_del = sharp_redistribute_route;
 	zclient->opaque_msg_handler = sharp_opaque_handler;
+
+	zclient->process_srv6_locator_chunk = sharp_zebra_process_srv6_locator_chunk;
 }

@@ -64,4 +64,11 @@ void sharp_opaque_reg_send(bool is_reg, uint32_t proto, uint32_t instance,
 extern void sharp_zebra_send_arp(const struct interface *ifp,
 				 const struct prefix *p);
 
+extern int sharp_zebra_srv6_manager_get_locator_chunk(const char* locator_name);
+extern int sharp_zebra_srv6_manager_release_locator_chunk(const char *locator_name);
+extern void sharp_install_seg6local_route_helper(struct prefix *p,
+						 uint8_t instance,
+						 enum seg6local_action_t act,
+						 struct seg6local_context *ctx);
+
 #endif
