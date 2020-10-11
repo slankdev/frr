@@ -24,6 +24,7 @@
 
 DEFINE_QOBJ_TYPE(srv6_locator)
 DEFINE_MTYPE_STATIC(LIB, SRV6_LOCATOR, "SRV6 locator")
+DEFINE_MTYPE_STATIC(LIB, SRV6_LOCATOR_CHUNK, "SRV6 locator chunk")
 DEFINE_MTYPE_STATIC(LIB, SRV6_FUNCTION, "SRV6 function")
 
 const char *seg6local_action2str(uint32_t action)
@@ -134,10 +135,23 @@ struct srv6_locator *srv6_locator_alloc(const char *name)
 	return locator;
 }
 
+struct srv6_locator_chunk *srv6_locator_chunk_alloc(void)
+{
+	struct srv6_locator_chunk *chunk = NULL;
+
+	chunk = XCALLOC(MTYPE_SRV6_LOCATOR_CHUNK, sizeof(struct srv6_locator_chunk));
+	return chunk;
+}
+
 void srv6_locator_free(struct srv6_locator *locator)
 {
 	list_delete(&locator->functions);
 	XFREE(MTYPE_SRV6_LOCATOR, locator);
+}
+
+void srv6_locator_chunk_free(struct srv6_locator_chunk *chunk)
+{
+	XFREE(MTYPE_SRV6_LOCATOR_CHUNK, chunk);
 }
 
 struct srv6_function *srv6_function_alloc(const struct prefix_ipv6 *prefix)
