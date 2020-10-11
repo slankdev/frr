@@ -2680,6 +2680,33 @@ stream_failure:
 	return;
 }
 
+int zsend_srv6_manager_get_locator_chunk_response(struct zserv *client,
+						  vrf_id_t vrf_id,
+						  struct srv6_locator *loc)
+{
+	struct stream *s = stream_new(ZEBRA_MAX_PACKET_SIZ);
+
+	zclient_create_header(s, ZEBRA_SRV6_MANAGER_GET_LOCATOR_CHUNK, vrf_id);
+
+	/* proto */
+	stream_putc(s, client->proto);
+
+	/* instance */
+	stream_putw(s, client->instance);
+
+	if (loc) {
+		stream_putw(s, strlen(loc->name));
+		stream_put(s, loc->name, strlen(loc->name));
+		stream_putw(s, loc->prefix.prefixlen);
+		stream_put(s, &loc->prefix.prefix, 16);
+	}
+
+	/* Write packet size. */
+	stream_putw_at(s, 0, stream_get_endp(s));
+
+	return zserv_send_message(client, s);
+}
+
 /* Send response to a table manager connect request to client */
 static void zread_table_manager_connect(struct zserv *client,
 					struct stream *msg, vrf_id_t vrf_id)
