@@ -455,7 +455,26 @@ static int zebra_srv6_manager_release_locator_chunk(struct zserv *client,
 						    vrf_id_t vrf_id)
 {
 	marker_debug_msg("call");
-	// TODO(slankdev):
+
+	struct srv6_locator *loc = NULL;
+	loc = zebra_srv6_locator_lookup(locator_name);
+	if (!loc) {
+		return -1;
+	}
+
+	struct listnode *node;
+	struct srv6_locator_chunk *chunk;
+	for (ALL_LIST_ELEMENTS_RO((struct list *)loc->chunks, node, chunk)) {
+		if (chunk->owner_proto != client->proto)
+			continue;
+		chunk->owner_proto = 0;
+	}
+
+	if (IS_ZEBRA_DEBUG_PACKET)
+		zlog_info("Released SRv6 locator chunk %s to %s instance %u",
+			  loc->name, zebra_route_string(client->proto),
+			  client->instance);
+
 	return 0;
 }
 

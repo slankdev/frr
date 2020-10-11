@@ -2945,10 +2945,30 @@ stream_failure:
 }
 
 static void zread_srv6_manager_release_locator_chunk(struct zserv *client,
-						 struct stream *msg,
-						 vrf_id_t vrf_id)
+						     struct stream *msg,
+						     vrf_id_t vrf_id)
 {
 	marker_debug_msg("call");
+
+	struct stream *s = msg;
+	uint8_t proto;
+	uint16_t instance;
+	uint16_t len;
+	char locator_name[SRV6_LOCNAME_SIZE] = {0};
+
+	/* Get data. */
+	STREAM_GETC(s, proto);
+	STREAM_GETW(s, instance);
+	STREAM_GETW(s, len);
+	STREAM_GET(locator_name, s, len);
+
+	assert(proto == client->proto && instance == client->instance);
+
+	/* call hook to release a chunk using wrapper */
+	srv6_manager_release_locator_chunk_call(client, locator_name, vrf_id);
+
+stream_failure:
+	return;
 }
 
 static void zread_srv6_manager_request(ZAPI_HANDLER_ARGS)
