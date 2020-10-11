@@ -56,12 +56,16 @@ DEFINE_HOOK(srv6_manager_client_connect,
 DEFINE_HOOK(srv6_manager_client_disconnect,
 	    (struct zserv *client), (client));
 DEFINE_HOOK(srv6_manager_get_chunk,
-	    (struct srv6_locator * *mc, struct zserv *client,
-	     uint8_t keep, uint32_t size, uint32_t base, vrf_id_t vrf_id),
-	    (mc, client, keep, size, base, vrf_id));
+	    (struct srv6_locator **loc,
+	     struct zserv *client,
+	     const char *locator_name,
+	     vrf_id_t vrf_id),
+	    (loc, client, locator_name, vrf_id));
 DEFINE_HOOK(srv6_manager_release_chunk,
-	    (struct zserv *client, uint32_t start, uint32_t end),
-	    (client, start, end));
+	    (struct zserv *client,
+	     const char *locator_name,
+	     vrf_id_t vrf_id),
+	    (client, locator_name, vrf_id));
 
 /* define wrappers to be called in zapi_msg.c (as hooks must be called in
  * source file where they were defined)
@@ -70,6 +74,21 @@ DEFINE_HOOK(srv6_manager_release_chunk,
 void srv6_manager_client_connect_call(struct zserv *client, vrf_id_t vrf_id)
 {
 	hook_call(srv6_manager_client_connect, client, vrf_id);
+}
+
+void srv6_manager_get_locator_chunk_call(struct srv6_locator **loc,
+					 struct zserv *client,
+					 const char *locator_name,
+					 vrf_id_t vrf_id)
+{
+	hook_call(srv6_manager_get_chunk, loc, client, locator_name, vrf_id);
+}
+
+void srv6_manager_release_locator_chunk_call(struct zserv *client,
+					     const char *locator_name,
+					     vrf_id_t vrf_id)
+{
+	hook_call(srv6_manager_release_chunk, client, locator_name, vrf_id);
 }
 
 int srv6_manager_client_disconnect_cb(struct zserv *client)
@@ -354,9 +373,30 @@ struct zebra_srv6 *zebra_srv6_get_default(void)
 	return &srv6;
 }
 
+static int zebra_srv6_manager_get_locator_chunk(struct srv6_locator **loc,
+					  struct zserv *client,
+					  const char *locator_name,
+					  vrf_id_t vrf_id)
+{
+	marker_debug_msg("call");
+	// TODO(slankdev):
+	return 0;
+}
+
+static int zebra_srv6_manager_release_locator_chunk(struct zserv *client,
+						    const char *locator_name,
+						    vrf_id_t vrf_id)
+{
+	marker_debug_msg("call");
+	// TODO(slankdev):
+	return 0;
+}
+
 void zebra_srv6_init(void)
 {
 	hook_register(zserv_client_close, zebra_srv6_cleanup);
+	hook_register(srv6_manager_get_chunk, zebra_srv6_manager_get_locator_chunk);
+	hook_register(srv6_manager_release_chunk, zebra_srv6_manager_release_locator_chunk);
 }
 
 bool zebra_srv6_is_enable(void)
