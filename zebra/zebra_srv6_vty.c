@@ -153,6 +153,42 @@ DEFUN (show_srv6_sid,
 	return CMD_SUCCESS;
 }
 
+DEFUN (show_srv6_manager,
+       show_srv6_manager_cmd,
+       "show segment-routing srv6 manager",
+       SHOW_STR
+       "Segment Routing\n"
+       "Segment Routing SRv6\n"
+       "SRv6 Manager Information\n")
+{
+	struct zebra_srv6 *srv6 = zebra_srv6_get_default();
+	struct srv6_locator *locator;
+	struct listnode *node;
+	char str[256];
+
+	vty_out(vty, "\n");
+	vty_out(vty, "Locators:\n");
+	for (ALL_LIST_ELEMENTS_RO(srv6->locators, node, locator)) {
+		prefix2str(&locator->prefix, str, sizeof(str));
+
+		vty_out(vty, "- Name: %s\n", locator->name);
+		vty_out(vty, "  Prefix: %s\n", str);
+		vty_out(vty, "  Chunks:\n");
+
+		struct listnode *subnode;
+		struct srv6_locator_chunk *chunk;
+		for (ALL_LIST_ELEMENTS_RO((struct list *)locator->chunks, subnode, chunk)) {
+			prefix2str(&chunk->prefix, str, sizeof(str));
+			vty_out(vty, "  - Prefix: %s\n", str);
+			vty_out(vty, "    Owner: %s\n", zebra_route_string(chunk->owner_proto));
+		}
+
+	}
+	vty_out(vty, "\n");
+
+	return CMD_SUCCESS;
+}
+
 DEFUN (show_srv6_locator,
        show_srv6_locator_cmd,
        "show segment-routing srv6 locator [json]",
@@ -391,6 +427,7 @@ void zebra_srv6_vty_init(void)
 	install_element(SRV6_LOC_NODE, &locator_prefix_cmd);
 
 	/* Command for operation */
+	install_element(VIEW_NODE, &show_srv6_manager_cmd);
 	install_element(VIEW_NODE, &show_srv6_sid_cmd);
 	install_element(VIEW_NODE, &show_srv6_locator_cmd);
 	install_element(VIEW_NODE, &show_srv6_locator_detail_cmd);
