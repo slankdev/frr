@@ -8509,6 +8509,8 @@ DEFUN (vpnv4_srv6_locator,
 	int ret;
 	const char *name = argv[1]->arg;
 
+	memset(bgp->vpn_policy[AFI_IP].srv6.locator,
+	       0, SRV6_LOCNAME_SIZE);
 	snprintf(bgp->vpn_policy[AFI_IP].srv6.locator,
 		 SRV6_LOCNAME_SIZE, "%s", name);
 	ret = bgp_zebra_srv6_manager_get_locator_chunk(name);
