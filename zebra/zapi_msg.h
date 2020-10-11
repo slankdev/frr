@@ -117,6 +117,9 @@ extern int zsend_zebra_srv6_function_add(struct zserv *client,
 					 struct srv6_function *fun);
 extern int zsend_zebra_srv6_function_delete(struct zserv *client,
 					    struct srv6_function *fun);
+extern int zsend_srv6_manager_get_locator_chunk_response(struct zserv *client,
+							 vrf_id_t vrf_id,
+							 struct srv6_locator *loc);
 
 #ifdef __cplusplus
 }

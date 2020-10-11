@@ -24,6 +24,7 @@
 #include "prefix.h"
 #include "stream.h"
 #include "srv6.h"
+#include "zebra/debug.h"
 #include "zebra/zapi_msg.h"
 #include "zebra/zserv.h"
 #include "zebra/zebra_router.h"
@@ -413,6 +414,21 @@ assign_srv6_locator_chunk(uint8_t proto,
 }
 
 static int
+zebra_srv6_manager_get_locator_chunk_response(struct srv6_locator *loc,
+					      struct zserv *client,
+					      vrf_id_t vrf_id)
+{
+	if (!loc)
+		zlog_err("Unable to assign SRv6 locator chunk to %s instance %u",
+			 zebra_route_string(client->proto), client->instance);
+	else if (IS_ZEBRA_DEBUG_PACKET)
+		zlog_info("Assigned SRv6 locator chunk %s to %s instance %u",
+			  loc->name, zebra_route_string(client->proto),
+			  client->instance);
+	return zsend_srv6_manager_get_locator_chunk_response(client, vrf_id, loc);
+}
+
+static int
 zebra_srv6_manager_get_locator_chunk(struct srv6_locator **loc,
 				     struct zserv *client,
 				     const char *locator_name,
@@ -421,8 +437,7 @@ zebra_srv6_manager_get_locator_chunk(struct srv6_locator **loc,
 	marker_debug_msg("call");
 	*loc = assign_srv6_locator_chunk(client->proto, client->instance,
 					 client->session_id, locator_name);
-	//return srv6_manager_get_locator_chunk_response(*loc, client, vrf_id);
-	return 0;
+	return zebra_srv6_manager_get_locator_chunk_response(*loc, client, vrf_id);
 }
 
 static int zebra_srv6_manager_release_locator_chunk(struct zserv *client,
