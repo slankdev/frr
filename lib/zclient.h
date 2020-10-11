@@ -371,6 +371,7 @@ struct zclient {
 	int (*srv6_locator_delete)(ZAPI_CALLBACK_ARGS);
 	int (*srv6_function_add)(ZAPI_CALLBACK_ARGS);
 	int (*srv6_function_delete)(ZAPI_CALLBACK_ARGS);
+	void (*srv6_locator_chunk)(ZAPI_CALLBACK_ARGS);
 	int (*handle_error)(enum zebra_error_types error);
 	int (*opaque_msg_handler)(ZAPI_CALLBACK_ARGS);
 	int (*opaque_register_handler)(ZAPI_CALLBACK_ARGS);
