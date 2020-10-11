@@ -751,6 +751,16 @@ static int nhg_notify_owner(ZAPI_CALLBACK_ARGS)
 	return 0;
 }
 
+int sharp_zebra_srv6_manager_get_locator_chunk(const char* locator_name)
+{
+	return srv6_manager_get_locator_chunk(zclient, locator_name);
+}
+
+int sharp_zebra_srv6_manager_release_locator_chunk(const char *locator_name)
+{
+	return srv6_manager_release_locator_chunk(zclient, locator_name);
+}
+
 void sharp_zebra_init(void)
 {
 	struct zclient_options opt = {.receive_notify = true};

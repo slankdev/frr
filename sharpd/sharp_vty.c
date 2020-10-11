@@ -697,6 +697,43 @@ DEFPY (neigh_discover,
 	return CMD_SUCCESS;
 }
 
+DEFPY (sharp_srv6_manager_get_locator_chunk,
+       sharp_srv6_manager_get_locator_chunk_cmd,
+       "sharp srv6-manager get-locator-chunk NAME$locator_name",
+       SHARP_STR
+       "Segment-Routing IPv6\n"
+       "Get SRv6 locator-chunk\n"
+       "SRv6 Locator name\n")
+{
+	int ret;
+	memset(sg.srv6_locator_name, 0, SRV6_LOCNAME_SIZE);
+	snprintf(sg.srv6_locator_name, SRV6_LOCNAME_SIZE,
+		 "%s", locator_name);
+
+	ret = sharp_zebra_srv6_manager_get_locator_chunk(locator_name);
+	if (ret < 0)
+		return CMD_WARNING_CONFIG_FAILED;
+
+	return CMD_SUCCESS;
+}
+
+DEFPY (sharp_srv6_manager_release_locator_chunk,
+       sharp_srv6_manager_release_locator_chunk_cmd,
+       "sharp srv6-manager release-locator-chunk NAME$locator_name",
+       SHARP_STR
+       "Segment-Routing IPv6\n"
+       "Release SRv6 locator-chunk\n"
+       "SRv6 Locator name\n")
+{
+	int ret;
+	memset(sg.srv6_locator_name, 0, SRV6_LOCNAME_SIZE);
+	ret = sharp_zebra_srv6_manager_release_locator_chunk(locator_name);
+	if (ret < 0)
+		return CMD_WARNING_CONFIG_FAILED;
+
+	return CMD_SUCCESS;
+}
+
 void sharp_vty_init(void)
 {
 	install_element(ENABLE_NODE, &install_routes_data_dump_cmd);
@@ -715,6 +752,9 @@ void sharp_vty_init(void)
 	install_element(ENABLE_NODE, &send_opaque_unicast_cmd);
 	install_element(ENABLE_NODE, &send_opaque_reg_cmd);
 	install_element(ENABLE_NODE, &neigh_discover_cmd);
+
+	install_element(ENABLE_NODE, &sharp_srv6_manager_get_locator_chunk_cmd);
+	install_element(ENABLE_NODE, &sharp_srv6_manager_release_locator_chunk_cmd);
 
 	install_element(VIEW_NODE, &show_debugging_sharpd_cmd);
 

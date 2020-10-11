@@ -137,6 +137,7 @@ static void sharp_global_init(void)
 {
 	memset(&sg, 0, sizeof(sg));
 	sg.nhs = list_new();
+	sg.srv6_locator_chunks = list_new();
 }
 
 int main(int argc, char **argv, char **envp)
