@@ -79,11 +79,18 @@ struct srv6_locator {
 	int algonum;
 	uint64_t current;
 	struct list *functions;
-	uint8_t owner_proto;
+
+	uint8_t owner_proto; // TODO(slankdev): DELETE
+	struct list *chunks;
 
 	QOBJ_FIELDS
 };
 DECLARE_QOBJ_TYPE(srv6_locator)
+
+struct srv6_locator_chunk {
+	uint8_t owner_proto;
+	struct prefix_ipv6 prefix;
+};
 
 struct srv6_function {
 	char locator_name[SRV6_LOCNAME_SIZE];
