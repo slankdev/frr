@@ -2873,6 +2873,41 @@ stream_failure:		/* for STREAM_GETX */
 	return;
 }
 
+static void bgp_zebra_process_srv6_locator_chunk(ZAPI_CALLBACK_ARGS)
+{
+	marker_debug_msg("call");
+
+	struct bgp *bgp = NULL;
+	struct stream *s = NULL;
+	uint8_t proto;
+	uint16_t instance;
+	uint16_t len;
+	char name[256] = {0};
+	struct prefix_ipv6 *chunk = NULL;
+
+	s = zclient->ibuf;
+	STREAM_GETC(s, proto);
+	STREAM_GETW(s, instance);
+
+	STREAM_GETW(s, len);
+	STREAM_GET(name, s, len);
+
+	chunk = prefix_ipv6_new();
+	STREAM_GETW(s, chunk->prefixlen);
+	STREAM_GET(&chunk->prefix, s, 16);
+
+	bgp = bgp_get_default();
+	if (!bgp->vpn_policy[AFI_IP].srv6.locator_chunk)
+		bgp->vpn_policy[AFI_IP].srv6.locator_chunk = list_new();
+
+	listnode_add(bgp->vpn_policy[AFI_IP].srv6.locator_chunk, chunk);
+	return;
+
+stream_failure:
+	free(chunk);
+	return;
+}
+
 extern struct zebra_privs_t bgpd_privs;
 
 static int bgp_ifp_create(struct interface *ifp)
@@ -2933,6 +2968,7 @@ void bgp_zebra_init(struct thread_master *master, unsigned short instance)
 	zclient->ipset_entry_notify_owner = ipset_entry_notify_owner;
 	zclient->iptable_notify_owner = iptable_notify_owner;
 	zclient->instance = instance;
+	zclient->srv6_locator_chunk = bgp_zebra_process_srv6_locator_chunk;
 }
 
 void bgp_zebra_destroy(void)

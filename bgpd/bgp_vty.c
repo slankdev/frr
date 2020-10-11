@@ -8513,6 +8513,11 @@ DEFUN (vpnv4_srv6_locator,
 	       0, SRV6_LOCNAME_SIZE);
 	snprintf(bgp->vpn_policy[AFI_IP].srv6.locator,
 		 SRV6_LOCNAME_SIZE, "%s", name);
+
+	if (!bgp->vpn_policy[AFI_IP].srv6.locator_chunk) {
+		bgp->vpn_policy[AFI_IP].srv6.locator_chunk = list_new();
+	}
+
 	ret = bgp_zebra_srv6_manager_get_locator_chunk(name);
 	if (ret < 0)
 		return CMD_WARNING_CONFIG_FAILED;
@@ -8539,6 +8544,33 @@ DEFUN (no_vpnv4_srv6_locator,
 	return CMD_SUCCESS;
 }
 
+DEFUN (show_bgp_segment_routing_srv6,
+       show_bgp_segment_routing_srv6_cmd,
+       "show bgp segment-routing srv6",
+       SHOW_STR
+       BGP_STR
+       "Segment-Routing\n"
+       "Segment-Routing IPv6\n")
+{
+	struct bgp *bgp = bgp_get_default();
+	vty_out(vty, "[SRv6-locator chunk]\n");
+	vty_out(vty, "name: %s\n", bgp->vpn_policy[AFI_IP].srv6.locator);
+
+	struct list *chunks = bgp->vpn_policy[AFI_IP].srv6.locator_chunk;
+	if (!chunks) {
+		vty_out(vty, "no chunks\n");
+		return CMD_SUCCESS;
+	}
+
+	char str[256];
+	struct listnode *node;
+	struct prefix_ipv6 *chunk;
+	for (ALL_LIST_ELEMENTS_RO((struct list *)chunks, node, chunk)) {
+		prefix2str(chunk, str, sizeof(str));
+		vty_out(vty, "%s\n", str);
+	}
+	return CMD_SUCCESS;
+}
 
 /* Recalculate bestpath and re-advertise a prefix */
 static int bgp_clear_prefix(struct vty *vty, const char *view_name,
@@ -17514,6 +17546,7 @@ void bgp_vty_init(void)
 	install_element(BGP_IPV6_NODE, &af_no_import_vrf_route_map_cmd);
 
 	/* vpn with srv6 backend */
+	install_element(VIEW_NODE, &show_bgp_segment_routing_srv6_cmd);
 	install_element(BGP_VPNV4_NODE, &bgp_segment_routing_srv6_cmd);
 	install_element(BGP_VPNV4_SRV6_NODE, &vpnv4_srv6_locator_cmd);
 	install_element(BGP_VPNV4_SRV6_NODE, &no_vpnv4_srv6_locator_cmd);

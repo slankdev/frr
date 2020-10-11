@@ -207,6 +207,7 @@ typedef enum {
 
 struct vpn_policy_srv6 {
 	char locator[SRV6_LOCNAME_SIZE];
+	struct list *locator_chunk;
 };
 
 struct vpn_policy {
