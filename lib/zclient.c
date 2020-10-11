@@ -2733,7 +2733,7 @@ int srv6_manager_get_locator_chunk(struct zclient *zclient,
 	/* send request */
 	s = zclient->obuf;
 	stream_reset(s);
-	zclient_create_header(s, ZEBRA_GET_SRV6_LOCATOR_CHUNK, VRF_DEFAULT);
+	zclient_create_header(s, ZEBRA_SRV6_MANAGER_GET_LOCATOR_CHUNK, VRF_DEFAULT);
 
 	/* proto */
 	stream_putc(s, zclient->redist_default);
@@ -2773,7 +2773,7 @@ int srv6_manager_release_locator_chunk(struct zclient *zclient,
 	/* send request */
 	s = zclient->obuf;
 	stream_reset(s);
-	zclient_create_header(s, ZEBRA_RELEASE_SRV6_LOCATOR_CHUNK, VRF_DEFAULT);
+	zclient_create_header(s, ZEBRA_SRV6_MANAGER_RELEASE_LOCATOR_CHUNK, VRF_DEFAULT);
 
 	/* proto */
 	stream_putc(s, zclient->redist_default);
