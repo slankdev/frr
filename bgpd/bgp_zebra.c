@@ -2977,7 +2977,7 @@ void bgp_zebra_init(struct thread_master *master, unsigned short instance)
 	zclient->ipset_entry_notify_owner = ipset_entry_notify_owner;
 	zclient->iptable_notify_owner = iptable_notify_owner;
 	zclient->instance = instance;
-	zclient->srv6_locator_chunk = bgp_zebra_process_srv6_locator_chunk;
+	zclient->process_srv6_locator_chunk = bgp_zebra_process_srv6_locator_chunk;
 }
 
 void bgp_zebra_destroy(void)
