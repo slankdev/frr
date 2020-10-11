@@ -2708,6 +2708,35 @@ stream_failure:
 	return -1;
 }
 
+/**
+ * Function to request a srv6-locator chunk in a syncronous way
+ *
+ * It first writes the request to zclient output buffer and then
+ * immediately reads the answer from the input buffer.
+ *
+ * @param zclient Zclient used to connect to table manager (zebra)
+ * @param locator_name Name of SRv6-locator
+ * @result 0 on success, -1 otherwise
+ */
+int srv6_manager_get_locator_chunk(struct zclient *zclient,
+				   const char *locator_name)
+{
+	return 0;
+}
+
+/**
+ * Function to release a srv6-locator chunk
+ *
+ * @param zclient Zclient used to connect to table manager (zebra)
+ * @param locator_name Name of SRv6-locator
+ * @result 0 on success, -1 otherwise
+ */
+int srv6_manager_release_locator_chunk(struct zclient *zclient,
+				       const char *locator_name)
+{
+	return 0;
+}
+
 /*
  * Asynchronous label chunk request
  *
