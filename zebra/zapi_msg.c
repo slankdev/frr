@@ -2680,6 +2680,33 @@ stream_failure:
 	return;
 }
 
+int zsend_srv6_manager_get_locator_chunk_response(struct zserv *client,
+						  vrf_id_t vrf_id,
+						  struct srv6_locator *loc)
+{
+	struct stream *s = stream_new(ZEBRA_MAX_PACKET_SIZ);
+
+	zclient_create_header(s, ZEBRA_SRV6_MANAGER_GET_LOCATOR_CHUNK, vrf_id);
+
+	/* proto */
+	stream_putc(s, client->proto);
+
+	/* instance */
+	stream_putw(s, client->instance);
+
+	if (loc) {
+		stream_putw(s, strlen(loc->name));
+		stream_put(s, loc->name, strlen(loc->name));
+		stream_putw(s, loc->prefix.prefixlen);
+		stream_put(s, &loc->prefix.prefix, 16);
+	}
+
+	/* Write packet size. */
+	stream_putw_at(s, 0, stream_get_endp(s));
+
+	return zserv_send_message(client, s);
+}
+
 /* Send response to a table manager connect request to client */
 static void zread_table_manager_connect(struct zserv *client,
 					struct stream *msg, vrf_id_t vrf_id)
@@ -2889,6 +2916,41 @@ static void zread_table_manager_request(ZAPI_HANDLER_ARGS)
 	}
 }
 
+static void zread_srv6_manager_get_locator_chunk(struct zserv *client,
+						 struct stream *msg,
+						 vrf_id_t vrf_id)
+{
+	marker_debug_msg("call");
+
+	struct stream *s = msg;
+	uint8_t proto;
+	uint16_t instance;
+	uint16_t len;
+	char locator_name[SRV6_LOCNAME_SIZE] = {0};
+
+	/* Get data. */
+	STREAM_GETC(s, proto);
+	STREAM_GETW(s, instance);
+	STREAM_GETW(s, len);
+	STREAM_GET(locator_name, s, len);
+
+	assert(proto == client->proto && instance == client->instance);
+
+	/* call hook to get a chunk using wrapper */
+	struct srv6_locator *loc = NULL;
+	srv6_manager_get_locator_chunk_call(&loc, client, locator_name, vrf_id);
+
+stream_failure:
+	return;
+}
+
+static void zread_srv6_manager_release_locator_chunk(struct zserv *client,
+						 struct stream *msg,
+						 vrf_id_t vrf_id)
+{
+	marker_debug_msg("call");
+}
+
 static void zread_srv6_manager_request(ZAPI_HANDLER_ARGS)
 {
 	marker_debug_msg("call");
@@ -2896,6 +2958,12 @@ static void zread_srv6_manager_request(ZAPI_HANDLER_ARGS)
 	switch (hdr->command) {
 	case ZEBRA_SRV6_MANAGER_CONNECT:
 		zread_srv6_manager_connect(client, msg, zvrf_id(zvrf));
+		break;
+	case ZEBRA_SRV6_MANAGER_GET_LOCATOR_CHUNK:
+		zread_srv6_manager_get_locator_chunk(client, msg, zvrf_id(zvrf));
+		break;
+	case ZEBRA_SRV6_MANAGER_RELEASE_LOCATOR_CHUNK:
+		zread_srv6_manager_release_locator_chunk(client, msg, zvrf_id(zvrf));
 		break;
 	default:
 		zlog_err("%s: unknown SRv6 Mamanger command", __func__);
@@ -3468,6 +3536,8 @@ void (*const zserv_handlers[])(ZAPI_HANDLER_ARGS) = {
 	[ZEBRA_SRV6_FUNCTION_ADD] = zrecv_zebra_srv6_function_add,
 	[ZEBRA_SRV6_FUNCTION_DELETE] = zrecv_zebra_srv6_function_delete,
 	[ZEBRA_SRV6_MANAGER_CONNECT] = zread_srv6_manager_request,
+	[ZEBRA_SRV6_MANAGER_GET_LOCATOR_CHUNK] = zread_srv6_manager_request,
+	[ZEBRA_SRV6_MANAGER_RELEASE_LOCATOR_CHUNK] = zread_srv6_manager_request,
 	[ZEBRA_CLIENT_CAPABILITIES] = zread_client_capabilities,
 	[ZEBRA_NEIGH_DISCOVER] = zread_neigh_discover,
 	[ZEBRA_NHG_ADD] = zread_nhg_add,

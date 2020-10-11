@@ -24,6 +24,7 @@
 #include "prefix.h"
 #include "stream.h"
 #include "srv6.h"
+#include "zebra/debug.h"
 #include "zebra/zapi_msg.h"
 #include "zebra/zserv.h"
 #include "zebra/zebra_router.h"
@@ -56,12 +57,16 @@ DEFINE_HOOK(srv6_manager_client_connect,
 DEFINE_HOOK(srv6_manager_client_disconnect,
 	    (struct zserv *client), (client));
 DEFINE_HOOK(srv6_manager_get_chunk,
-	    (struct srv6_locator * *mc, struct zserv *client,
-	     uint8_t keep, uint32_t size, uint32_t base, vrf_id_t vrf_id),
-	    (mc, client, keep, size, base, vrf_id));
+	    (struct srv6_locator **loc,
+	     struct zserv *client,
+	     const char *locator_name,
+	     vrf_id_t vrf_id),
+	    (loc, client, locator_name, vrf_id));
 DEFINE_HOOK(srv6_manager_release_chunk,
-	    (struct zserv *client, uint32_t start, uint32_t end),
-	    (client, start, end));
+	    (struct zserv *client,
+	     const char *locator_name,
+	     vrf_id_t vrf_id),
+	    (client, locator_name, vrf_id));
 
 /* define wrappers to be called in zapi_msg.c (as hooks must be called in
  * source file where they were defined)
@@ -70,6 +75,21 @@ DEFINE_HOOK(srv6_manager_release_chunk,
 void srv6_manager_client_connect_call(struct zserv *client, vrf_id_t vrf_id)
 {
 	hook_call(srv6_manager_client_connect, client, vrf_id);
+}
+
+void srv6_manager_get_locator_chunk_call(struct srv6_locator **loc,
+					 struct zserv *client,
+					 const char *locator_name,
+					 vrf_id_t vrf_id)
+{
+	hook_call(srv6_manager_get_chunk, loc, client, locator_name, vrf_id);
+}
+
+void srv6_manager_release_locator_chunk_call(struct zserv *client,
+					     const char *locator_name,
+					     vrf_id_t vrf_id)
+{
+	hook_call(srv6_manager_release_chunk, client, locator_name, vrf_id);
 }
 
 int srv6_manager_client_disconnect_cb(struct zserv *client)
@@ -354,9 +374,86 @@ struct zebra_srv6 *zebra_srv6_get_default(void)
 	return &srv6;
 }
 
+/**
+ * Core function, assigns srv6-locator chunks
+ *
+ * It first searches through the list to check if there's one available
+ * (previously released). Otherwise it creates and assigns a new one
+ *
+ * @param proto Daemon protocol of client, to identify the owner
+ * @param instance Instance, to identify the owner
+ * @param session_id SessionID of client
+ * @param name Name of SRv6-locator
+ * @return Pointer to the assigned srv6-locator chunk,
+ *         or NULL if the request could not be satisfied
+ */
+static struct srv6_locator *
+assign_srv6_locator_chunk(uint8_t proto,
+			  uint16_t instance,
+			  uint32_t session_id,
+			  const char *locator_name)
+{
+	marker_debug_msg("call");
+
+	struct srv6_locator *loc = NULL;
+	loc = zebra_srv6_locator_lookup(locator_name);
+	if (!loc) {
+		zlog_info("%s: locator %s was not found",
+			  __func__, locator_name);
+		return NULL;
+	}
+
+	if (loc->owner_proto != 0 && loc->owner_proto != proto) {
+		zlog_info("%s: locator is already owned by proto(%u)",
+			  __func__, loc->owner_proto);
+		return NULL;
+	}
+
+	loc->owner_proto = proto;
+	return loc;
+}
+
+static int
+zebra_srv6_manager_get_locator_chunk_response(struct srv6_locator *loc,
+					      struct zserv *client,
+					      vrf_id_t vrf_id)
+{
+	if (!loc)
+		zlog_err("Unable to assign SRv6 locator chunk to %s instance %u",
+			 zebra_route_string(client->proto), client->instance);
+	else if (IS_ZEBRA_DEBUG_PACKET)
+		zlog_info("Assigned SRv6 locator chunk %s to %s instance %u",
+			  loc->name, zebra_route_string(client->proto),
+			  client->instance);
+	return zsend_srv6_manager_get_locator_chunk_response(client, vrf_id, loc);
+}
+
+static int
+zebra_srv6_manager_get_locator_chunk(struct srv6_locator **loc,
+				     struct zserv *client,
+				     const char *locator_name,
+				     vrf_id_t vrf_id)
+{
+	marker_debug_msg("call");
+	*loc = assign_srv6_locator_chunk(client->proto, client->instance,
+					 client->session_id, locator_name);
+	return zebra_srv6_manager_get_locator_chunk_response(*loc, client, vrf_id);
+}
+
+static int zebra_srv6_manager_release_locator_chunk(struct zserv *client,
+						    const char *locator_name,
+						    vrf_id_t vrf_id)
+{
+	marker_debug_msg("call");
+	// TODO(slankdev):
+	return 0;
+}
+
 void zebra_srv6_init(void)
 {
 	hook_register(zserv_client_close, zebra_srv6_cleanup);
+	hook_register(srv6_manager_get_chunk, zebra_srv6_manager_get_locator_chunk);
+	hook_register(srv6_manager_release_chunk, zebra_srv6_manager_release_locator_chunk);
 }
 
 bool zebra_srv6_is_enable(void)

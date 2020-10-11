@@ -45,12 +45,16 @@ DECLARE_HOOK(srv6_manager_client_connect,
 DECLARE_HOOK(srv6_manager_client_disconnect,
 	     (struct zserv *client), (client));
 DECLARE_HOOK(srv6_manager_get_chunk,
-	     (struct srv6_locator * *mc, struct zserv *client,
-	      uint8_t keep, uint32_t size, uint32_t base, vrf_id_t vrf_id),
+	     (struct srv6_locator **loc,
+	      struct zserv *client,
+	      const char *locator_name,
+	      vrf_id_t vrf_id),
 	     (mc, client, keep, size, base, vrf_id));
 DECLARE_HOOK(srv6_manager_release_chunk,
-	     (struct zserv *client, uint32_t start, uint32_t end),
-	     (client, start, end));
+	     (struct zserv *client,
+	      const char *locator_name,
+	      vrf_id_t vrf_id),
+	     (client, locator_name, vrf_id));
 
 
 extern void zebra_srv6_locator_add(struct srv6_locator *locator);
@@ -74,5 +78,15 @@ extern void zebra_srv6_init(void);
 extern void zebra_srv6_locator_update_all(struct zserv *client);
 extern struct zebra_srv6 *zebra_srv6_get_default(void);
 extern bool zebra_srv6_is_enable(void);
+
+extern void srv6_manager_client_connect_call(struct zserv *client, vrf_id_t vrf_id);
+extern void srv6_manager_get_locator_chunk_call(struct srv6_locator **loc,
+						struct zserv *client,
+						const char *locator_name,
+						vrf_id_t vrf_id);
+extern void srv6_manager_release_locator_chunk_call(struct zserv *client,
+						    const char *locator_name,
+						    vrf_id_t vrf_id);
+extern int srv6_manager_client_disconnect_cb(struct zserv *client);
 
 #endif /* _ZEBRA_SRV6_H */
