@@ -207,6 +207,42 @@ DEFUN (show_srv6_locator,
 	return CMD_SUCCESS;
 }
 
+DEFUN (show_srv6_locator_detail,
+       show_srv6_locator_detail_cmd,
+       "show segment-routing srv6 locator NAME detail [json]",
+       SHOW_STR
+       "Segment Routing\n"
+       "Segment Routing SRv6\n"
+       "Locator Information\n"
+       "Locator Name\n"
+       JSON_STR)
+{
+	const bool uj = use_json(argc, argv);
+	struct zebra_srv6 *srv6 = zebra_srv6_get_default();
+	struct srv6_locator *locator;
+	struct listnode *node;
+	char str[256];
+	const char *locator_name = argv[4]->arg;
+
+	if (uj) {
+		vty_out(vty, "JSON format isn't supported\n");
+		return CMD_WARNING;
+	} else {
+		for (ALL_LIST_ELEMENTS_RO(srv6->locators, node, locator)) {
+			if (strcmp(locator->name, locator_name) != 0) {
+				continue;
+			}
+
+			prefix2str(&locator->prefix, str, sizeof(str));
+			vty_out(vty, "Name: %s\n", locator->name);
+			vty_out(vty, "Prefix: %s\n", str);
+		}
+
+	}
+
+	return CMD_SUCCESS;
+}
+
 DEFUN_NOSH (segment_routing,
             segment_routing_cmd,
             "segment-routing",
@@ -339,4 +375,5 @@ void zebra_srv6_vty_init(void)
 	/* Command for operation */
 	install_element(VIEW_NODE, &show_srv6_sid_cmd);
 	install_element(VIEW_NODE, &show_srv6_locator_cmd);
+	install_element(VIEW_NODE, &show_srv6_locator_detail_cmd);
 }
