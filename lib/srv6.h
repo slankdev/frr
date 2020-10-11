@@ -79,8 +79,6 @@ struct srv6_locator {
 	int algonum;
 	uint64_t current;
 	struct list *functions;
-
-	uint8_t owner_proto; // TODO(slankdev): DELETE
 	struct list *chunks;
 
 	QOBJ_FIELDS

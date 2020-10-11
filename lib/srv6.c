@@ -129,6 +129,7 @@ struct srv6_locator *srv6_locator_alloc(const char *name)
 	locator = XCALLOC(MTYPE_SRV6_LOCATOR, sizeof(struct srv6_locator));
 	strlcpy(locator->name, name, sizeof(locator->name));
 	locator->functions = list_new();
+	locator->chunks = list_new();
 	QOBJ_REG(locator, srv6_locator);
 	return locator;
 }
