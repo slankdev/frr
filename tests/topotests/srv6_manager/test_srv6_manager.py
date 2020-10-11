@@ -64,6 +64,8 @@ def setup_module(mod):
         router.run("/bin/bash {}/setup".format(CWD))
         router.load_config(TopoRouter.RD_ZEBRA, os.path.join(CWD, '{}/zebra.conf'.format(rname)))
         router.load_config(TopoRouter.RD_BGP, os.path.join(CWD, '{}/bgpd.conf'.format(rname)))
+        router.load_config(TopoRouter.RD_SHARP, os.path.join(CWD, '{}/sharpd.conf'.format(rname)))
+
     tgen.start_router()
 
 def teardown_module(mod):
