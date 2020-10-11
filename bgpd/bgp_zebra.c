@@ -3329,3 +3329,13 @@ int bgp_zebra_stale_timer_update(struct bgp *bgp)
 		zlog_debug("send capabilty success");
 	return BGP_GR_SUCCESS;
 }
+
+int bgp_zebra_srv6_manager_get_locator_chunk(const char *locator_name)
+{
+	return srv6_manager_get_locator_chunk(zclient, locator_name);
+}
+
+int bgp_zebra_srv6_manager_release_locator_chunk(const char *locator_name)
+{
+	return srv6_manager_release_locator_chunk(zclient, locator_name);
+}

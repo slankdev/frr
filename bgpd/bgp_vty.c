@@ -8506,10 +8506,15 @@ DEFUN (vpnv4_srv6_locator,
        "SRv6 locator name\n")
 {
 	VTY_DECLVAR_CONTEXT(bgp, bgp);
-
+	int ret;
 	const char *name = argv[1]->arg;
+
 	snprintf(bgp->vpn_policy[AFI_IP].srv6.locator,
 		 SRV6_LOCNAME_SIZE, "%s", name);
+	ret = bgp_zebra_srv6_manager_get_locator_chunk(name);
+	if (ret < 0)
+		return CMD_WARNING_CONFIG_FAILED;
+
 	return CMD_SUCCESS;
 }
 
@@ -8520,9 +8525,15 @@ DEFUN (no_vpnv4_srv6_locator,
        "SRv6 locator\n")
 {
 	VTY_DECLVAR_CONTEXT(bgp, bgp);
+	int ret;
 
 	memset(bgp->vpn_policy[AFI_IP].srv6.locator,
 	       0, SRV6_LOCNAME_SIZE);
+	ret = bgp_zebra_srv6_manager_release_locator_chunk(
+			bgp->vpn_policy[AFI_IP].srv6.locator);
+	if (ret < 0)
+		return CMD_WARNING_CONFIG_FAILED;
+
 	return CMD_SUCCESS;
 }
 
