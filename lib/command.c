@@ -816,6 +816,9 @@ enum node_type node_parent(enum node_type node)
 	case BGP_EVPN_VNI_NODE:
 		ret = BGP_EVPN_NODE;
 		break;
+	case BGP_VPNV4_SRV6_NODE:
+		ret = BGP_VPNV4_NODE;
+		break;
 	case KEYCHAIN_KEY_NODE:
 		ret = KEYCHAIN_NODE;
 		break;
