@@ -8489,6 +8489,89 @@ DEFUN_NOSH (exit_address_family,
 	return CMD_SUCCESS;
 }
 
+DEFUN_NOSH (bgp_segment_routing_srv6,
+       bgp_segment_routing_srv6_cmd,
+       "segment-routing srv6",
+       "Segment-Routing configuration\n"
+       "Segment-Routing SRv6 configuration\n")
+{
+	vty->node = BGP_VPNV4_SRV6_NODE;
+	return CMD_SUCCESS;
+}
+
+DEFUN (vpnv4_srv6_locator,
+       vpnv4_srv6_locator_cmd,
+       "locator NAME",
+       "SRv6 locator\n"
+       "SRv6 locator name\n")
+{
+	VTY_DECLVAR_CONTEXT(bgp, bgp);
+	int ret;
+	const char *name = argv[1]->arg;
+
+	memset(bgp->vpn_policy[AFI_IP].srv6.locator,
+	       0, SRV6_LOCNAME_SIZE);
+	snprintf(bgp->vpn_policy[AFI_IP].srv6.locator,
+		 SRV6_LOCNAME_SIZE, "%s", name);
+
+	if (!bgp->vpn_policy[AFI_IP].srv6.locator_chunk) {
+		bgp->vpn_policy[AFI_IP].srv6.locator_chunk = list_new();
+	}
+
+	ret = bgp_zebra_srv6_manager_get_locator_chunk(name);
+	if (ret < 0)
+		return CMD_WARNING_CONFIG_FAILED;
+
+	return CMD_SUCCESS;
+}
+
+DEFUN (no_vpnv4_srv6_locator,
+       no_vpnv4_srv6_locator_cmd,
+       "no locator",
+       NO_STR
+       "SRv6 locator\n")
+{
+	VTY_DECLVAR_CONTEXT(bgp, bgp);
+	int ret;
+
+	memset(bgp->vpn_policy[AFI_IP].srv6.locator,
+	       0, SRV6_LOCNAME_SIZE);
+	ret = bgp_zebra_srv6_manager_release_locator_chunk(
+			bgp->vpn_policy[AFI_IP].srv6.locator);
+	if (ret < 0)
+		return CMD_WARNING_CONFIG_FAILED;
+
+	return CMD_SUCCESS;
+}
+
+DEFUN (show_bgp_segment_routing_srv6,
+       show_bgp_segment_routing_srv6_cmd,
+       "show bgp segment-routing srv6",
+       SHOW_STR
+       BGP_STR
+       "Segment-Routing\n"
+       "Segment-Routing IPv6\n")
+{
+	struct bgp *bgp = bgp_get_default();
+	vty_out(vty, "[SRv6-locator chunk]\n");
+	vty_out(vty, "name: %s\n", bgp->vpn_policy[AFI_IP].srv6.locator);
+
+	struct list *chunks = bgp->vpn_policy[AFI_IP].srv6.locator_chunk;
+	if (!chunks) {
+		vty_out(vty, "no chunks\n");
+		return CMD_SUCCESS;
+	}
+
+	char str[256];
+	struct listnode *node;
+	struct prefix_ipv6 *chunk;
+	for (ALL_LIST_ELEMENTS_RO((struct list *)chunks, node, chunk)) {
+		prefix2str(chunk, str, sizeof(str));
+		vty_out(vty, "%s\n", str);
+	}
+	return CMD_SUCCESS;
+}
+
 /* Recalculate bestpath and re-advertise a prefix */
 static int bgp_clear_prefix(struct vty *vty, const char *view_name,
 			    const char *ip_str, afi_t afi, safi_t safi,
@@ -15617,6 +15700,15 @@ static void bgp_config_write_family(struct vty *vty, struct bgp *bgp, afi_t afi,
 		}
 	}
 
+	if (afi == AFI_IP && safi == SAFI_MPLS_VPN) {
+		const char *locator_name = bgp->vpn_policy[AFI_IP].srv6.locator;
+		if (strlen(locator_name) > 0) {
+			vty_frame(vty, "  segment-routing srv6\n");
+			vty_out(vty, "   locator %s\n", locator_name);
+			vty_endframe(vty, "  !\n");
+		}
+	}
+
 	vty_endframe(vty, " exit-address-family\n");
 }
 
@@ -16066,6 +16158,13 @@ static struct cmd_node bgp_flowspecv6_node = {
 	.prompt = "%s(config-router-af-vpnv6)# ",
 };
 
+static struct cmd_node bgp_vpnv4_srv6_node = {
+	.name = "bgp vpnv4 srv6",
+	.node = BGP_VPNV4_SRV6_NODE,
+	.parent_node = BGP_VPNV4_NODE,
+	.prompt = "%s(config-router-af-srv6)# ",
+};
+
 static void community_list_vty(void);
 
 static void bgp_ac_neighbor(vector comps, struct cmd_token *token)
@@ -16135,6 +16234,7 @@ void bgp_vty_init(void)
 	install_node(&bgp_ipv6_multicast_node);
 	install_node(&bgp_ipv6_labeled_unicast_node);
 	install_node(&bgp_vpnv4_node);
+	install_node(&bgp_vpnv4_srv6_node);
 	install_node(&bgp_vpnv6_node);
 	install_node(&bgp_evpn_node);
 	install_node(&bgp_evpn_vni_node);
@@ -16150,6 +16250,7 @@ void bgp_vty_init(void)
 	install_default(BGP_IPV6M_NODE);
 	install_default(BGP_IPV6L_NODE);
 	install_default(BGP_VPNV4_NODE);
+	install_default(BGP_VPNV4_SRV6_NODE);
 	install_default(BGP_VPNV6_NODE);
 	install_default(BGP_FLOWSPECV4_NODE);
 	install_default(BGP_FLOWSPECV6_NODE);
@@ -17443,6 +17544,12 @@ void bgp_vty_init(void)
 	install_element(BGP_IPV6_NODE, &af_no_route_map_vpn_imexport_cmd);
 	install_element(BGP_IPV4_NODE, &af_no_import_vrf_route_map_cmd);
 	install_element(BGP_IPV6_NODE, &af_no_import_vrf_route_map_cmd);
+
+	/* vpn with srv6 backend */
+	install_element(VIEW_NODE, &show_bgp_segment_routing_srv6_cmd);
+	install_element(BGP_VPNV4_NODE, &bgp_segment_routing_srv6_cmd);
+	install_element(BGP_VPNV4_SRV6_NODE, &vpnv4_srv6_locator_cmd);
+	install_element(BGP_VPNV4_SRV6_NODE, &no_vpnv4_srv6_locator_cmd);
 }
 
 #include "memory.h"

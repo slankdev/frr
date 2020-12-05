@@ -27,6 +27,7 @@
 #include "hook.h"
 #include "frr_pthread.h"
 #include "lib/json.h"
+#include "lib/srv6.h"
 #include "vrf.h"
 #include "vty.h"
 #include "iana_afi.h"
@@ -204,6 +205,11 @@ typedef enum {
 	BGP_VPN_POLICY_DIR_MAX = 2
 } vpn_policy_direction_t;
 
+struct vpn_policy_srv6 {
+	char locator[SRV6_LOCNAME_SIZE];
+	struct list *locator_chunk;
+};
+
 struct vpn_policy {
 	struct bgp *bgp; /* parent */
 	afi_t afi;
@@ -233,6 +239,9 @@ struct vpn_policy {
 	 * vrf names that we are being exported to.
 	 */
 	struct list *export_vrf;
+
+	/* SRv6 backend */
+	struct vpn_policy_srv6 srv6;
 };
 
 /*
