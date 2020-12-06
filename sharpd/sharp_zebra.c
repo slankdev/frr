@@ -220,7 +220,7 @@ void sharp_install_routes_helper(struct prefix *p, vrf_id_t vrf_id,
 				 uint8_t instance, uint32_t nhgid,
 				 const struct nexthop_group *nhg,
 				 const struct nexthop_group *backup_nhg,
-				 uint32_t routes)
+				 uint32_t routes, uint32_t flags)
 {
 	uint32_t temp, i;
 	bool v4 = false;
@@ -239,7 +239,7 @@ void sharp_install_routes_helper(struct prefix *p, vrf_id_t vrf_id,
 
 	monotime(&sg.r.t_start);
 	for (i = 0; i < routes; i++) {
-		route_add(p, vrf_id, (uint8_t)instance, nhgid, nhg, backup_nhg);
+		route_add(p, vrf_id, (uint8_t)instance, nhgid, nhg, backup_nhg, flags);
 		if (v4)
 			p->u.prefix4.s_addr = htonl(++temp);
 		else
@@ -290,7 +290,7 @@ static void handle_repeated(bool installed)
 		sharp_install_routes_helper(&p, sg.r.vrf_id, sg.r.inst,
 					    sg.r.nhgid, &sg.r.nhop_group,
 					    &sg.r.backup_nhop_group,
-					    sg.r.total_routes);
+					    sg.r.total_routes, sg.r.flags);
 	}
 }
 
@@ -409,7 +409,7 @@ void nhg_del(uint32_t id)
 
 void route_add(const struct prefix *p, vrf_id_t vrf_id, uint8_t instance,
 	       uint32_t nhgid, const struct nexthop_group *nhg,
-	       const struct nexthop_group *backup_nhg)
+	       const struct nexthop_group *backup_nhg, uint32_t flags)
 {
 	struct zapi_route api;
 	struct zapi_nexthop *api_nh;
@@ -423,6 +423,7 @@ void route_add(const struct prefix *p, vrf_id_t vrf_id, uint8_t instance,
 	api.safi = SAFI_UNICAST;
 	memcpy(&api.prefix, p, sizeof(*p));
 
+	api.flags = flags;
 	SET_FLAG(api.flags, ZEBRA_FLAG_ALLOW_RECURSION);
 	SET_FLAG(api.message, ZAPI_MESSAGE_NEXTHOP);
 
