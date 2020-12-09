@@ -30,6 +30,7 @@
 #include "zebra/zebra_pbr.h"
 #include "zebra/zebra_errors.h"
 #include "zebra/label_manager.h"
+#include "zebra/zebra_srv6.h"
 
 
 #ifdef __cplusplus
@@ -107,6 +108,14 @@ extern int zsend_sr_policy_notify_status(uint32_t color,
 
 extern int zsend_client_close_notify(struct zserv *client,
 				     struct zserv *closed_client);
+
+extern int zsend_zebra_srv6_locator_add(struct zserv *client,
+					struct srv6_locator *loc);
+extern int zsend_zebra_srv6_locator_delete(struct zserv *client,
+					   struct srv6_locator *loc);
+extern int zsend_srv6_manager_get_locator_chunk_response(struct zserv *client,
+							 vrf_id_t vrf_id,
+							 struct srv6_locator *loc);
 
 #ifdef __cplusplus
 }
