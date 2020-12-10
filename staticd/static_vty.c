@@ -36,6 +36,7 @@
 #include "static_memory.h"
 #include "static_vty.h"
 #include "static_routes.h"
+#include "static_srv6.h"
 #include "static_debug.h"
 #ifndef VTYSH_EXTRACT_PL
 #include "staticd/static_vty_clippy.c"
@@ -1127,6 +1128,48 @@ DEFUN_NOSH (show_debugging_static,
 	return CMD_SUCCESS;
 }
 
+// TODO(slankdev)
+DEFPY_YANG(srv6_function,
+      srv6_function_cmd,
+      "[no] srv6 function NAME$locator \
+       <auto$index_auto|(0-255)$index_specify> INTERFACE$outif \
+	<End$action_end| \
+	 End_X$action_endx X:X::X:X$endx_nh6>",
+      NO_STR
+      "SRv6 configuration\n"
+      "SRv6 function configuration\n"
+      "SRv6 function Locator Name\n"
+      "SRv6 function SID auto assign\n"
+      "SRv6 function SID specify Index\n"
+      "SRv6 function Output interface\n"
+      "SRv6 End function\n"
+      "SRv6 End.X function\n"
+      "V6 Nexthop address of End.X function\n"
+      )
+{
+	/* int ret; */
+	int index;
+	enum seg6local_action_t action;
+	struct seg6local_context ctx = {{0}};
+
+	static_srv6_locator_get(locator);
+	/* ret = sharp_zebra_srv6_manager_get_locator_chunk(locator); */
+	/* if (ret < 0) */
+	/* 	return CMD_WARNING_CONFIG_FAILED; */
+
+	index = index_auto ? -1 : index_specify;
+	action = ZEBRA_SEG6_LOCAL_ACTION_UNSPEC;
+	if (action_end) {
+		action = ZEBRA_SEG6_LOCAL_ACTION_END;
+	} else if (action_endx) {
+		action = ZEBRA_SEG6_LOCAL_ACTION_END_X;
+		ctx.nh6 = endx_nh6;
+	}
+	static_srv6_function_get(locator, index, action, &ctx);
+
+	return CMD_SUCCESS;
+}
+
 static struct cmd_node debug_node = {
 	.name = "debug",
 	.node = DEBUG_NODE,
@@ -1157,4 +1200,6 @@ void static_vty_init(void)
 	install_element(ENABLE_NODE, &show_debugging_static_cmd);
 	install_element(ENABLE_NODE, &debug_staticd_cmd);
 	install_element(CONFIG_NODE, &debug_staticd_cmd);
+
+	install_element(CONFIG_NODE, &srv6_function_cmd);
 }

@@ -507,6 +507,58 @@ extern void static_zebra_route_add(struct route_node *rn,
 			   zclient, &api);
 }
 
+static void static_zebra_process_srv6_locator_chunk(ZAPI_CALLBACK_ARGS)
+{
+/* 	struct stream *s = NULL; */
+/* 	uint8_t proto; */
+/* 	uint16_t instance; */
+/* 	uint16_t len; */
+/* 	char name[256] = {0}; */
+/* 	struct prefix_ipv6 *chunk = NULL; */
+/* 	chunk = prefix_ipv6_new(); */
+/*  */
+/* 	s = zclient->ibuf; */
+/* 	STREAM_GETC(s, proto); */
+/* 	STREAM_GETW(s, instance); */
+/*  */
+/* 	STREAM_GETW(s, len); */
+/* 	STREAM_GET(name, s, len); */
+/*  */
+/* 	STREAM_GETW(s, chunk->prefixlen); */
+/* 	STREAM_GET(&chunk->prefix, s, 16); */
+/*  */
+/* 	if (zclient->redist_default != proto) { */
+/* 		zlog_err("Got SRv6 Manager msg with wrong proto %u", proto); */
+/* 		return; */
+/* 	} */
+/* 	if (zclient->instance != instance) { */
+/* 		zlog_err("Got SRv6 Manager msg with wrong instance %u", proto); */
+/* 		return; */
+/* 	} */
+/*  */
+/* 	struct listnode *loc_node; */
+/* 	struct sharp_srv6_locator *loc; */
+/* 	for (ALL_LIST_ELEMENTS_RO(sg.srv6_locators, loc_node, loc)) { */
+/* 		if (strcmp(loc->name, name)) */
+/* 			continue; */
+/*  */
+/* 		struct listnode *chunk_node; */
+/* 		struct prefix_ipv6 *c; */
+/* 		for (ALL_LIST_ELEMENTS_RO(loc->chunks, chunk_node, c)) { */
+/* 			if (!prefix_cmp(c, chunk)) */
+/* 				return; */
+/* 		} */
+/* 		listnode_add(loc->chunks, chunk); */
+/* 	} */
+/* 	return; */
+/*  */
+/* stream_failure: */
+/* 	free(chunk); */
+/*  */
+/* 	zlog_err("%s: can't get locator_chunk!!", __func__); */
+	return;
+}
+
 void static_zebra_init(void)
 {
 	struct zclient_options opt = { .receive_notify = true };
@@ -523,6 +575,7 @@ void static_zebra_init(void)
 	zclient->interface_address_delete = interface_address_delete;
 	zclient->route_notify_owner = route_notify_owner;
 	zclient->nexthop_update = static_zebra_nexthop_update;
+	zclient->process_srv6_locator_chunk = static_zebra_process_srv6_locator_chunk;
 
 	static_nht_hash = hash_create(static_nht_hash_key,
 				      static_nht_hash_cmp,

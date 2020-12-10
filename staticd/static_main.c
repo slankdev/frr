@@ -35,6 +35,7 @@
 
 #include "static_vrf.h"
 #include "static_vty.h"
+#include "static_srv6.h"
 #include "static_routes.h"
 #include "static_zebra.h"
 #include "static_debug.h"
@@ -157,6 +158,7 @@ int main(int argc, char **argv, char **envp)
 
 	static_debug_init();
 	static_vrf_init();
+	static_srv6_init();
 
 	static_zebra_init();
 	static_vty_init();
