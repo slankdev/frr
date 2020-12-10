@@ -1,0 +1,15 @@
+{
+  "2001:db8:1:1:ffff::/128":[
+    {
+      "prefix":"2001:db8:1:1:ffff::/80",
+      "protocol":"static",
+      "selected":true,
+      "installed":true,
+      "nexthops":[{
+        "fib":true,
+        "active":true,
+        "seg6local":{ "action":"End" }
+      }]
+    }
+  ]
+}
