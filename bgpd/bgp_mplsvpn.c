@@ -364,6 +364,7 @@ void vpn_leak_zebra_vrf_label_withdraw(struct bgp *bgp, afi_t afi)
  */
 void vpn_leak_zebra_vrf_sid_update(struct bgp *bgp, afi_t afi)
 {
+	zlog_info("%s: slankdev afi=%s", __func__, afi2str(afi));
 	int debug = BGP_DEBUG(vpn, VPN_LEAK_LABEL);
 
 	if (bgp->vrf_id == VRF_UNKNOWN) {
@@ -413,6 +414,7 @@ void vpn_leak_zebra_vrf_sid_update(struct bgp *bgp, afi_t afi)
  */
 void vpn_leak_zebra_vrf_sid_withdraw(struct bgp *bgp, afi_t afi)
 {
+	zlog_info("%s: slankdev", __func__);
 	/* mpls_label_t label = MPLS_LABEL_NONE; */
 	/* int debug = BGP_DEBUG(vpn, VPN_LEAK_LABEL); */
         /*  */
@@ -1009,6 +1011,7 @@ void vpn_leak_from_vrf_update(struct bgp *bgp_vpn,	    /* to */
 
 	/* Set SID for SRv6 VPN */
 	if (!sid_zero(bgp_vrf->vpn_policy[afi].tovpn_sid)) {
+		zlog_info("%s: NON ZERO SIDDDDDDDDDD", __func__);
 		static_attr.srv6_l3vpn = XMALLOC(MTYPE_BGP_SRV6_VPN,
 					 sizeof(struct bgp_attr_srv6_vpn));
 		static_attr.srv6_l3vpn->sid_flags = 0x00;
@@ -1016,6 +1019,8 @@ void vpn_leak_from_vrf_update(struct bgp *bgp_vpn,	    /* to */
 		memcpy(&static_attr.srv6_l3vpn->sid,
 		       bgp_vrf->vpn_policy[afi].tovpn_sid,
 		       sizeof(static_attr.srv6_l3vpn->sid));
+	} else {
+		zlog_info("%s: ZERO SIDDDDDDDDDD", __func__);
 	}
 
 
@@ -1184,6 +1189,7 @@ void vpn_leak_from_vrf_update_all(struct bgp *bgp_vpn, /* to */
 				  struct bgp *bgp_vrf, /* from */
 				  afi_t afi)
 {
+	zlog_info("%s: slankdev", __func__);
 	struct bgp_dest *bn;
 	struct bgp_path_info *bpi;
 	int debug = BGP_DEBUG(vpn, VPN_LEAK_FROM_VRF);

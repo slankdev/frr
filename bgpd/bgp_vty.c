@@ -9087,8 +9087,11 @@ DEFPY (af_sid_vpn_export,
 	struct in6_addr sid_buf;
 	struct in6_addr *sid = get_srv6_sid_auto(bgp_get_default(), &sid_buf);
 	if (sid) {
+		zlog_info("%s: SID_ALLOCATION!!!!SLANKDEV!!!\n", __func__);
 		bgp->vpn_policy[afi].tovpn_sid = XCALLOC(MTYPE_TMP, 16);
 		*bgp->vpn_policy[afi].tovpn_sid = *sid;
+	} else {
+		zlog_info("SLANKDEV!!! NO SID\n");
 	}
 
 	/* post-change */
@@ -9496,6 +9499,7 @@ DEFPY_YANG (bgp_imexport_vpn,
 	else
 		nb_cli_enqueue_change(vty, ".", NB_OP_CREATE, "true");
 
+	zlog_info("%s: slankdev", __func__);
 	return nb_cli_apply_changes(vty, base_xpath);
 }
 
@@ -9742,6 +9746,7 @@ DEFPY (bgp_srv6_locator,
        "Specify SRv6 locator\n")
 {
 	VTY_DECLVAR_CONTEXT(bgp, bgp);
+	vty_out(vty, "loc: %s\n", name);
 
 	if (strlen(bgp->srv6_locator_name) > 0
 	    && strcmp(name, bgp->srv6_locator_name) != 0) {

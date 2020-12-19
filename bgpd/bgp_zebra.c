@@ -3044,12 +3044,16 @@ static void bgp_zebra_process_srv6_locator_chunk(ZAPI_CALLBACK_ARGS)
 		return;
 	}
 
+	zlog_info("%s: SLANKDEV!! (1)", __func__);
+
 	struct bgp *bgp = bgp_get_default();
 	if (strcmp(bgp->srv6_locator_name, name) != 0) {
 		zlog_info("name unmatch %s:%s",
 			  bgp->srv6_locator_name, name);
 		return;
 	}
+
+	zlog_info("%s: SLANKDEV!! (2)", __func__);
 
 	struct listnode *node;
 	struct prefix_ipv6 *c;
@@ -3059,6 +3063,7 @@ static void bgp_zebra_process_srv6_locator_chunk(ZAPI_CALLBACK_ARGS)
 	}
 
 	listnode_add(bgp->srv6_locator_chunks, chunk);
+	zlog_info("%s: SLANKDEV!! (4)", __func__);
 
 	for (ALL_LIST_ELEMENTS_RO(bm->bgp, node, bgp)) {
 		if (SET_FLAG(bgp->vpn_policy[AFI_IP6].flags,
@@ -3068,6 +3073,7 @@ static void bgp_zebra_process_srv6_locator_chunk(ZAPI_CALLBACK_ARGS)
 				struct in6_addr sid_buf;
 				sid = get_srv6_sid_auto(bgp_get_default(),
 							&sid_buf);
+				zlog_info("%s: SLANKDEV!!", __func__);
 
 				struct vpn_policy *vp = &bgp->vpn_policy[AFI_IP6];
 				if (bgp->name) {
@@ -3086,6 +3092,7 @@ static void bgp_zebra_process_srv6_locator_chunk(ZAPI_CALLBACK_ARGS)
 		}
 	}
 
+	zlog_info("%s: SLANKDEV!! (5)", __func__);
 	return;
 
 stream_failure:

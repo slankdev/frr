@@ -9797,6 +9797,7 @@ static int bgp_global_afi_safi_ip_unicast_vpn_config_import_export_vpn_modify(
 	struct nb_cb_modify_args *args, const char *direction_str,
 	bool is_enable)
 {
+	zlog_info("%s: slankdev direction_str=%s", __func__, direction_str);
 	struct bgp *bgp;
 	const struct lyd_node *af_dnode;
 	const char *af_name;
@@ -9826,6 +9827,7 @@ static int bgp_global_afi_safi_ip_unicast_vpn_config_import_export_vpn_modify(
 	previous_state = CHECK_FLAG(bgp->af_flags[afi][safi], flag);
 
 	if (is_enable) {
+		zlog_info("%s: slankdev set flag ", __func__);
 		SET_FLAG(bgp->af_flags[afi][safi], flag);
 		if (!previous_state) {
 			/* trigger export current vrf */

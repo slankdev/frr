@@ -145,6 +145,10 @@ static inline int vpn_leak_to_vpn_active(struct bgp *bgp_vrf, afi_t afi,
 static inline int vpn_leak_from_vpn_active(struct bgp *bgp_vrf, afi_t afi,
 					   const char **pmsg)
 {
+	zlog_info("%s: slankdev afi=%s name=%s",
+		  __func__, afi2str(afi),
+		  bgp_vrf->name ? bgp_vrf->name : "def");
+
 	if (bgp_vrf->inst_type != BGP_INSTANCE_TYPE_VRF
 		&& bgp_vrf->inst_type != BGP_INSTANCE_TYPE_DEFAULT) {
 
@@ -157,6 +161,12 @@ static inline int vpn_leak_from_vpn_active(struct bgp *bgp_vrf, afi_t afi,
 		if (pmsg)
 			*pmsg = "destination bgp instance vrf is VRF_UNKNOWN";
 		return 0;
+	}
+
+	if (true) {
+		zlog_info("%s: SLANKDEV BGP_CONFIG_MPLSVPN_TO_VRF_IMPORT: %s", __func__,
+			   CHECK_FLAG(bgp_vrf->af_flags[afi][SAFI_UNICAST],
+				      BGP_CONFIG_MPLSVPN_TO_VRF_IMPORT) ? "1" : "0");
 	}
 
 	/* Is vrf configured to import from vpn? */
@@ -210,6 +220,7 @@ static inline void vpn_leak_postchange(vpn_policy_direction_t direction,
 				       afi_t afi, struct bgp *bgp_vpn,
 				       struct bgp *bgp_vrf)
 {
+	zlog_info("%s: slankdev afi=%s", __func__, afi2str(afi));
 	/* Detect when default bgp instance is not (yet) defined by config */
 	if (!bgp_vpn)
 		return;
@@ -229,7 +240,17 @@ static inline void vpn_leak_postchange(vpn_policy_direction_t direction,
 		sid = bgp_vrf->vpn_policy[afi].tovpn_sid;
 		sidls = bgp_vrf->vpn_policy[afi].tovpn_zebra_vrf_sid_last_sent;
 		if (sid_diff(sid, sidls)) {
+			zlog_info("%s: YYYYYYYYY", __func__);
+			zlog_info("%s: YYYYYYYYY", __func__);
+			zlog_info("%s: YYYYYYYYY", __func__);
+			zlog_info("%s: YYYYYYYYY", __func__);
 			vpn_leak_zebra_vrf_sid_update(bgp_vrf, afi);
+		} else {
+			zlog_info("%s: [%p, %p]", __func__, sid, sidls);
+			zlog_info("%s: NNNNNNNNN", __func__);
+			zlog_info("%s: NNNNNNNNN", __func__);
+			zlog_info("%s: NNNNNNNNN", __func__);
+			zlog_info("%s: NNNNNNNNN", __func__);
 		}
 
 		vpn_leak_from_vrf_update_all(bgp_vpn, bgp_vrf, afi);
