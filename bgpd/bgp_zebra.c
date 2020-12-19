@@ -2977,6 +2977,23 @@ static int bgp_ifp_create(struct interface *ifp)
 	return 0;
 }
 
+static struct in6_addr *
+get_srv6_sid_auto(struct bgp *bgp, struct in6_addr *sid)
+{
+	if (!bgp || !bgp->srv6_locator_chunks)
+		return NULL;
+
+	struct listnode *node;
+	struct prefix_ipv6 *chunk;
+	for (ALL_LIST_ELEMENTS_RO(bgp->srv6_locator_chunks, node, chunk)) {
+		//TODO(slankdev)
+		*sid = chunk->prefix;
+		sid->s6_addr16[7] = 1;
+		return sid;
+	}
+	return NULL;
+}
+
 static void bgp_zebra_process_srv6_locator_chunk(ZAPI_CALLBACK_ARGS)
 {
 	struct stream *s = NULL;
@@ -3021,6 +3038,33 @@ static void bgp_zebra_process_srv6_locator_chunk(ZAPI_CALLBACK_ARGS)
 	}
 
 	listnode_add(bgp->srv6_locator_chunks, chunk);
+
+	for (ALL_LIST_ELEMENTS_RO(bm->bgp, node, bgp)) {
+		if (SET_FLAG(bgp->vpn_policy[AFI_IP6].flags,
+			     BGP_VPN_POLICY_TOVPN_SID_AUTO)) {
+			if (!bgp->vpn_policy[AFI_IP6].tovpn_sid) {
+				struct in6_addr *sid;
+				struct in6_addr sid_buf;
+				sid = get_srv6_sid_auto(bgp_get_default(),
+							&sid_buf);
+
+				struct vpn_policy *vp = &bgp->vpn_policy[AFI_IP6];
+				if (bgp->name) {
+					vpn_leak_prechange(BGP_VPN_POLICY_DIR_TOVPN,
+						vp->afi, bgp_get_default(), vp->bgp);
+
+					struct in6_addr *new;
+					new = XCALLOC(MTYPE_TMP, 16);
+					*new = *sid;
+					bgp->vpn_policy[AFI_IP6].tovpn_sid = new;
+
+					vpn_leak_postchange(BGP_VPN_POLICY_DIR_TOVPN,
+						vp->afi, bgp_get_default(), vp->bgp);
+				}
+			}
+		}
+	}
+
 	return;
 
 stream_failure:

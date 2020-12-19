@@ -356,6 +356,84 @@ void vpn_leak_zebra_vrf_label_withdraw(struct bgp *bgp, afi_t afi)
 	bgp->vpn_policy[afi].tovpn_zebra_vrf_label_last_sent = label;
 }
 
+/*
+ * This function informs zebra of the srv6-function this vrf sets on routes
+ * leaked to VPN. Zebra should install this srv6-function in the kernel with
+ * an action of "End.DT4/6's IP FIB to route the PDU." as well
+ * vpn_leak_zebra_vrf_label_update()
+ */
+void vpn_leak_zebra_vrf_sid_update(struct bgp *bgp, afi_t afi)
+{
+	int debug = BGP_DEBUG(vpn, VPN_LEAK_LABEL);
+
+	if (bgp->vrf_id == VRF_UNKNOWN) {
+		if (debug)
+			zlog_debug("%s: vrf %s: afi %s: "
+				   "vrf_id not set, can't "
+				   "set zebra vrf label",
+				   __func__, bgp->name_pretty,
+				   afi2str(afi));
+		return;
+	}
+
+	struct in6_addr *sid = NULL;
+	sid = bgp->vpn_policy[afi].tovpn_sid;
+	if (!sid) {
+		if (debug)
+			zlog_debug("%s: vrf %s: afi %s: "
+				   "sid not set", __func__,
+				   bgp->name_pretty,
+				   afi2str(afi));
+		return;
+	}
+
+	if (debug) {
+		char str[256] = "n/a";
+		if (sid)
+			inet_ntop(AF_INET6, sid, str, 256);
+		zlog_debug("%s: vrf %s: afi %s: setting sid %s for vrf id %d",
+			   __func__, bgp->name_pretty, afi2str(afi), str,
+			   bgp->vrf_id);
+	}
+
+	struct seg6local_context ctx = {{0}};
+	struct vrf *vrf = vrf_lookup_by_id(bgp->vrf_id);
+	ctx.table = vrf->data.l.table_id;
+	enum seg6local_action_t act = ZEBRA_SEG6_LOCAL_ACTION_END_DT6;
+	zclient_send_localsid(zclient, sid, bgp->vrf_id, act, &ctx);
+
+	struct in6_addr *sid_ls = XCALLOC(MTYPE_TMP, 16);
+	*sid_ls = *sid;
+	bgp->vpn_policy[afi].tovpn_zebra_vrf_sid_last_sent = sid_ls;
+}
+
+/*
+ * If zebra tells us vrf has become unconfigured, tell zebra not to
+ * use this srv6-function to forward to the vrf anymore
+ */
+void vpn_leak_zebra_vrf_sid_withdraw(struct bgp *bgp, afi_t afi)
+{
+	/* mpls_label_t label = MPLS_LABEL_NONE; */
+	/* int debug = BGP_DEBUG(vpn, VPN_LEAK_LABEL); */
+        /*  */
+	/* if (bgp->vrf_id == VRF_UNKNOWN) { */
+	/* 	if (debug) { */
+	/* 		zlog_debug( */
+	/* 			"%s: vrf_id not set, can't delete zebra vrf label", */
+	/* 			__func__); */
+	/* 	} */
+	/* 	return; */
+	/* } */
+        /*  */
+	/* if (debug) { */
+	/* 	zlog_debug("%s: deleting label for vrf %s (id=%d)", __func__, */
+	/* 		   bgp->name_pretty, bgp->vrf_id); */
+	/* } */
+        /*  */
+	/* zclient_send_vrf_label(zclient, bgp->vrf_id, afi, label, ZEBRA_LSP_BGP); */
+	/* bgp->vpn_policy[afi].tovpn_zebra_vrf_label_last_sent = label; */
+}
+
 int vpn_leak_label_callback(
 	mpls_label_t label,
 	void *labelid,

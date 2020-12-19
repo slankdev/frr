@@ -9041,6 +9041,62 @@ DEFPY (af_label_vpn_export,
 	return CMD_SUCCESS;
 }
 
+static struct in6_addr *
+get_srv6_sid_auto(struct bgp *bgp, struct in6_addr *sid)
+{
+	if (!bgp || !bgp->srv6_locator_chunks)
+		return NULL;
+
+	struct listnode *node;
+	struct prefix_ipv6 *chunk;
+	for (ALL_LIST_ELEMENTS_RO(bgp->srv6_locator_chunks, node, chunk)) {
+		//TODO(slankdev)
+		*sid = chunk->prefix;
+		sid->s6_addr16[7] = 1;
+		return sid;
+	}
+	return NULL;
+}
+
+DEFPY (af_sid_vpn_export,
+       af_sid_vpn_export_cmd,
+       "[no] sid vpn export auto",
+       NO_STR
+       "sid value for VRF\n"
+       "Between current address-family and vpn\n"
+       "For routes leaked from current address-family to vpn\n"
+       "Automatically assign a label\n")
+{
+	VTY_DECLVAR_CONTEXT(bgp, bgp);
+	afi_t afi;
+
+	afi = vpn_policy_getafi(vty, bgp, false);
+	if (afi == AFI_MAX)
+		return CMD_WARNING_CONFIG_FAILED;
+
+	if (CHECK_FLAG(bgp->vpn_policy[afi].flags,
+		       BGP_VPN_POLICY_TOVPN_SID_AUTO))
+		return CMD_SUCCESS;
+
+	/* pre-change */
+	vpn_leak_prechange(BGP_VPN_POLICY_DIR_TOVPN, afi,
+			   bgp_get_default(), bgp);
+
+	SET_FLAG(bgp->vpn_policy[afi].flags,
+		 BGP_VPN_POLICY_TOVPN_SID_AUTO);
+	struct in6_addr sid_buf;
+	struct in6_addr *sid = get_srv6_sid_auto(bgp_get_default(), &sid_buf);
+	if (sid) {
+		bgp->vpn_policy[afi].tovpn_sid = XCALLOC(MTYPE_TMP, 16);
+		*bgp->vpn_policy[afi].tovpn_sid = *sid;
+	}
+
+	/* post-change */
+	vpn_leak_postchange(BGP_VPN_POLICY_DIR_TOVPN, afi,
+			    bgp_get_default(), bgp);
+	return CMD_SUCCESS;
+}
+
 ALIAS (af_label_vpn_export,
        af_no_label_vpn_export_cmd,
        "no label vpn export",
@@ -18805,6 +18861,8 @@ void bgp_vty_init(void)
 	/* srv6 commands */
 	install_element(BGP_NODE, &bgp_segment_routing_srv6_cmd);
 	install_element(BGP_SRV6_NODE, &bgp_srv6_locator_cmd);
+	install_element(BGP_IPV4_NODE, &af_sid_vpn_export_cmd);
+	install_element(BGP_IPV6_NODE, &af_sid_vpn_export_cmd);
 }
 
 #include "memory.h"
