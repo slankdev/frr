@@ -29,6 +29,7 @@
 #include "lib/json.h"
 #include "vrf.h"
 #include "vty.h"
+#include "srv6.h"
 #include "iana_afi.h"
 
 /* For union sockunion.  */
@@ -214,6 +215,7 @@ struct vpn_policy {
 #define BGP_VPN_POLICY_TOVPN_LABEL_AUTO        (1 << 0)
 #define BGP_VPN_POLICY_TOVPN_RD_SET            (1 << 1)
 #define BGP_VPN_POLICY_TOVPN_NEXTHOP_SET       (1 << 2)
+#define BGP_VPN_POLICY_TOVPN_SID_AUTO          (1 << 3)
 
 	/*
 	 * If we are importing another vrf into us keep a list of
@@ -226,6 +228,12 @@ struct vpn_policy {
 	 * vrf names that we are being exported to.
 	 */
 	struct list *export_vrf;
+
+	/*
+	 * Segment-Routing SRv6 Mode
+	 */
+	struct in6_addr *tovpn_sid;
+	struct in6_addr *tovpn_zebra_vrf_sid_last_sent;
 };
 
 /*
@@ -304,6 +312,11 @@ enum bgp_link_bw_handling {
 
 RB_HEAD(bgp_es_vrf_rb_head, bgp_evpn_es_vrf);
 RB_PROTOTYPE(bgp_es_vrf_rb_head, bgp_evpn_es_vrf, rb_node, bgp_es_vrf_rb_cmp);
+
+struct bgp_srv6_function {
+	struct in6_addr sid;
+	char locator_name[SRV6_LOCNAME_SIZE];
+};
 
 /* BGP instance structure.  */
 struct bgp {
@@ -689,6 +702,12 @@ struct bgp {
 	/* BGP Conditional advertisement */
 	uint32_t condition_filter_count;
 	struct thread *t_condition_check;
+
+	/* BGP VPN SRv6 backend */
+	bool srv6_enabled;
+	char srv6_locator_name[SRV6_LOCNAME_SIZE];
+	struct list *srv6_locator_chunks;
+	struct list *srv6_functions;
 
 	QOBJ_FIELDS
 };
