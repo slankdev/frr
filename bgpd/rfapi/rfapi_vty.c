@@ -432,11 +432,11 @@ void rfapi_vty_out_vncinfo(struct vty *vty, const struct prefix *p,
 				decode_label(&bpi->extra->label[0]));
 
 		if (bpi->extra->num_sids) {
-			char buf[BUFSIZ];
+			/* char buf[BUFSIZ]; */
 
-			vty_out(vty, " sid=%s",
-				inet_ntop(AF_INET6, &bpi->extra->sid[0], buf,
-					  sizeof(buf)));
+			/* vty_out(vty, " sid=%s", */
+			/* 	inet_ntop(AF_INET6, &bpi->extra->sid[0], buf, */
+			/* 		  sizeof(buf))); */
 		}
 	}
 

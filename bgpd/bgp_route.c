@@ -4098,6 +4098,11 @@ int bgp_update(struct peer *peer, const struct prefix *p, uint32_t addpath_id,
 
 	/* Received Logging. */
 	if (bgp_debug_update(peer, p, NULL, 1)) {
+		if (!peer) {
+			zlog_info("slankdev!!!! abort");
+			abort();
+		}
+
 		if (!peer->rcvd_attr_printed) {
 			zlog_debug("%s rcvd UPDATE w/ attr: %s", peer->host,
 				   peer->rcvd_attr_str);
@@ -4107,7 +4112,9 @@ int bgp_update(struct peer *peer, const struct prefix *p, uint32_t addpath_id,
 		bgp_debug_rdpfxpath2str(afi, safi, prd, p, label, num_labels,
 					addpath_id ? 1 : 0, addpath_id, pfx_buf,
 					sizeof(pfx_buf));
-		zlog_debug("%s rcvd %s", peer->host, pfx_buf);
+		zlog_debug("%s rcvd %s",
+				peer->host ? peer->host : "NULL_SLANKDEV0",
+				pfx_buf);
 	}
 
 	/* Make new BGP info. */
@@ -10144,7 +10151,7 @@ void route_vty_out_detail(struct vty *vty, struct bgp *bgp,
 
 	/* Remote SID */
 	if (path->extra && path->extra->num_sids > 0 && safi != SAFI_EVPN) {
-		inet_ntop(AF_INET6, &path->extra->sid, buf, sizeof(buf));
+		inet_ntop(AF_INET6, &path->extra->sid[0], buf, sizeof(buf));
 		if (json_paths)
 			json_object_string_add(json_path, "remoteSid", buf);
 		else
