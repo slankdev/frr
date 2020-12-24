@@ -63,6 +63,7 @@ class TemplateTopo(Topo):
 
 def setup_module(module):
     tgen = Topogen(TemplateTopo, module.__name__)
+    tgen.gears["r1"].run("tcpdump -nni r1-eth0 -w /tmp/in.pcap &")
     tgen.start_topology()
 
     router = tgen.gears["r1"]
