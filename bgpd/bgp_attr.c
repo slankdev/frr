@@ -1120,6 +1120,8 @@ void bgp_attr_unintern_sub(struct attr *attr)
 
 	if (attr->srv6_vpn)
 		srv6_vpn_unintern(&attr->srv6_vpn);
+
+	UNSET_FLAG(attr->flag, ATTR_FLAG_BIT(BGP_ATTR_PREFIX_SID));
 }
 
 /*
@@ -1300,6 +1302,7 @@ bgp_attr_malformed(struct bgp_attr_parser_args *args, uint8_t subcode,
 	case BGP_ATTR_LARGE_COMMUNITIES:
 	case BGP_ATTR_ORIGINATOR_ID:
 	case BGP_ATTR_CLUSTER_LIST:
+	case BGP_ATTR_PREFIX_SID:
 		return BGP_ATTR_PARSE_WITHDRAW;
 	case BGP_ATTR_MP_REACH_NLRI:
 	case BGP_ATTR_MP_UNREACH_NLRI:

@@ -453,6 +453,9 @@ bool bgp_dump_attr(struct attr *attr, char *buf, size_t size)
 		if (attr->label_index != BGP_INVALID_LABEL_INDEX)
 			snprintf(buf + strlen(buf), size - strlen(buf),
 				 ", label-index %u", attr->label_index);
+		if (attr->srv6_l3vpn)
+			snprintf(buf + strlen(buf), size - strlen(buf),
+				 ", service-sid %pI6", &attr->srv6_l3vpn->sid);
 	}
 
 	if (strlen(buf) > 1)
