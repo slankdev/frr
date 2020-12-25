@@ -47,18 +47,21 @@ extern "C" {
 
 #define marker_debug() { \
     zlog_debug(C_YEL "%s:%d:%s()" C_DEF, __FILE__, __LINE__, __func__); \
+    zlog_tls_buffer_flush(); \
   } while(0)
 
 #define marker_debug_msg(fmt) { \
     char str[1000]; \
     snprintf(str, sizeof(str), fmt); \
     zlog_debug(C_YEL "%s:%d:%s() %s" C_DEF, __FILE__, __LINE__, __func__, str); \
+    zlog_tls_buffer_flush(); \
   } while(0)
 
 #define marker_debug_fmsg(fmt, ...) { \
     char str[1000]; \
     snprintf(str, sizeof(str), fmt, __VA_ARGS__); \
     zlog_debug(C_YEL "%s:%d:%s() %s" C_DEF, __FILE__, __LINE__, __func__, str); \
+    zlog_tls_buffer_flush(); \
   } while(0)
 
 /* Here is some guidance on logging levels to use:
