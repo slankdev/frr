@@ -3356,7 +3356,6 @@ void rfapiBgpInfoFilteredImportVPN(
 	uint8_t sub_type,  /* part of bgp_path_info */
 	uint32_t *label)   /* part of bgp_path_info */
 {
-	marker_debug_msg("call");
 	struct agg_table *rt = NULL;
 	struct agg_node *rn;
 	struct agg_node *n;
@@ -3374,7 +3373,6 @@ void rfapiBgpInfoFilteredImportVPN(
 	const char *action_str = NULL;
 	int is_it_ce = 0;
 
-	marker_debug_msg("mark");
 	struct bgp *bgp;
 	bgp = bgp_get_default(); /* assume 1 instance for now */
 
@@ -3396,7 +3394,6 @@ void rfapiBgpInfoFilteredImportVPN(
 	if (import_table == bgp->rfapi->it_ce)
 		is_it_ce = 1;
 
-	marker_debug_msg("mark");
 	vnc_zlog_debug_verbose("%s: entry: %s%s: prefix %s/%d: it %p, afi %s",
 			       __func__, (is_it_ce ? "CE-IT " : ""), action_str,
 			       rfapi_ntop(p->family, &p->u.prefix, buf, BUFSIZ),
@@ -3435,7 +3432,6 @@ void rfapiBgpInfoFilteredImportVPN(
 			return;
 		}
 	}
-	marker_debug_msg("mark");
 
 	/*
 	 * Figure out which radix tree the route would go into
@@ -3451,7 +3447,6 @@ void rfapiBgpInfoFilteredImportVPN(
 		flog_err(EC_LIB_DEVELOPMENT, "%s: bad afi %d", __func__, afi);
 		return;
 	}
-	marker_debug_msg("mark");
 
 
 	/* clear it */
@@ -3465,7 +3460,6 @@ void rfapiBgpInfoFilteredImportVPN(
 
 	vnc_zlog_debug_verbose("%s: rn=%p", __func__, rn);
 
-	marker_debug_msg("mark");
 
 	if (rn) {
 
@@ -3611,7 +3605,6 @@ void rfapiBgpInfoFilteredImportVPN(
 			}
 		}
 	}
-	marker_debug_msg("mark");
 
 
 	if (rn)
@@ -3621,7 +3614,6 @@ void rfapiBgpInfoFilteredImportVPN(
 		VNC_ITRCCK;
 		return;
 	}
-	marker_debug_msg("mark");
 
 
 	info_new =
@@ -3640,7 +3632,6 @@ void rfapiBgpInfoFilteredImportVPN(
 				       __func__, &vn_prefix);
 		info_new->extra->vnc.import.un_family = 0;
 	}
-	marker_debug_msg("mark");
 
 
 	if (rn) {
@@ -3664,7 +3655,6 @@ void rfapiBgpInfoFilteredImportVPN(
 				       __func__);
 		info_new->extra->vnc.import.aux_prefix = *aux_prefix;
 	}
-	marker_debug_msg("mark");
 
 
 	vnc_zlog_debug_verbose("%s: inserting bpi %p at prefix %pRN #%d",
@@ -3681,7 +3671,6 @@ void rfapiBgpInfoFilteredImportVPN(
 	RFAPI_UPDATE_ITABLE_COUNT(info_new, import_table, afi, 1);
 	vnc_import_bgp_exterior_add_route_interior(bgp, import_table, rn,
 						   info_new);
-	marker_debug_msg("mark");
 
 	if (import_table == bgp->rfapi->it_ce)
 		vnc_direct_bgp_add_route_ce(bgp, rn, info_new);
@@ -3704,7 +3693,6 @@ void rfapiBgpInfoFilteredImportVPN(
 
 		un_prefix_valid = 1;
 	}
-	marker_debug_msg("mark");
 
 
 	/*
@@ -3743,7 +3731,6 @@ void rfapiBgpInfoFilteredImportVPN(
 	 * We know that the new bpi will have been inserted before any routes
 	 * in holddown, so we can skip any that came before it
 	 */
-	marker_debug_msg("mark");
 
 	for (bpi = info_new->next; bpi; bpi = next) {
 
@@ -3796,7 +3783,6 @@ void rfapiBgpInfoFilteredImportVPN(
 		}
 		rfapiExpireVpnNow(import_table, rn, bpi, 0);
 	}
-	marker_debug_msg("mark");
 
 
 	if (!original_had_routes) {
@@ -3825,7 +3811,6 @@ void rfapiBgpInfoFilteredImportVPN(
 			vnc_direct_bgp_add_prefix(bgp, import_table, rn);
 		}
 	}
-	marker_debug_msg("mark");
 
 
 	if (!(bgp->rfapi_cfg->flags & BGP_VNC_CONFIG_CALLBACK_DISABLE)) {
