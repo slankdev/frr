@@ -2697,6 +2697,7 @@ static bgp_attr_parse_ret_t bgp_attr_psid_sub(uint8_t type, uint16_t length,
 					 sizeof(struct bgp_attr_srv6_vpn));
 		attr->srv6_vpn->sid_flags = sid_flags;
 		sid_copy(&attr->srv6_vpn->sid, &ipv6_sid);
+		attr->srv6_vpn = srv6_vpn_intern(attr->srv6_vpn);
 	}
 
 	/* Placeholder code for the SRv6 L3 Service type */
@@ -2739,6 +2740,7 @@ static bgp_attr_parse_ret_t bgp_attr_psid_sub(uint8_t type, uint16_t length,
 		attr->srv6_l3vpn->sid_flags = sid_flags;
 		attr->srv6_l3vpn->endpoint_behavior = endpoint_behavior;
 		sid_copy(&attr->srv6_l3vpn->sid, &ipv6_sid);
+		attr->srv6_l3vpn = srv6_l3vpn_intern(attr->srv6_l3vpn);
 	}
 
 	/* Placeholder code for Unsupported TLV */
