@@ -116,17 +116,17 @@ def setup_module(mod):
     tgen.gears["r1"].run("ip link set vrf10 up")
     tgen.gears["r1"].run("ip link add vrf20 type vrf table 20")
     tgen.gears["r1"].run("ip link set vrf20 up")
-    tgen.gears["r1"].run("ip link set eth1 vrf vrf10")
-    tgen.gears["r1"].run("ip link set eth2 vrf vrf10")
-    tgen.gears["r1"].run("ip link set eth3 vrf vrf20")
+    tgen.gears["r1"].run("ip link set eth1 master vrf10")
+    tgen.gears["r1"].run("ip link set eth2 master vrf10")
+    tgen.gears["r1"].run("ip link set eth3 master vrf20")
 
     tgen.gears["r2"].run("ip link add vrf10 type vrf table 10")
     tgen.gears["r2"].run("ip link set vrf10 up")
     tgen.gears["r2"].run("ip link add vrf20 type vrf table 20")
     tgen.gears["r2"].run("ip link set vrf20 up")
-    tgen.gears["r2"].run("ip link set eth1 vrf vrf10")
-    tgen.gears["r2"].run("ip link set eth2 vrf vrf20")
-    tgen.gears["r2"].run("ip link set eth3 vrf vrf20")
+    tgen.gears["r2"].run("ip link set eth1 master vrf10")
+    tgen.gears["r2"].run("ip link set eth2 master vrf20")
+    tgen.gears["r2"].run("ip link set eth3 master vrf20")
     tgen.start_router()
 
 
@@ -176,7 +176,7 @@ def test_rib():
 def test_ping():
     def _check(name, dest_addr, match):
         tgen = get_topogen()
-        output = tgen.gears[name].run("ping {} -c 1 -w 1".format(dest_addr))
+        output = tgen.gears[name].run("ping6 {} -c 1 -w 1".format(dest_addr))
         logger.info(output)
         assert match in output, "ping fail"
 
