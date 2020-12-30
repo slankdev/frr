@@ -36,6 +36,7 @@ sys.path.append(os.path.join(CWD, "../"))
 from lib import topotest
 from lib.topogen import Topogen, TopoRouter, get_topogen
 from lib.topolog import logger
+from lib.common_config import required_linux_kernel_version
 from mininet.topo import Topo
 
 
@@ -97,6 +98,10 @@ class Topology(Topo):
 
 
 def setup_module(mod):
+    result = required_linux_kernel_version("4.15")
+    if result is not True:
+        pytest.skip("Kernel requirements are not met")
+
     tgen = Topogen(Topology, mod.__name__)
     tgen.start_topology()
     router_list = tgen.routers()
