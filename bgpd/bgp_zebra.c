@@ -3006,10 +3006,6 @@ static int bgp_ifp_create(struct interface *ifp)
 static void bgp_zebra_process_srv6_locator_chunk(ZAPI_CALLBACK_ARGS)
 {
 	struct stream *s = NULL;
-	uint8_t proto;
-	uint16_t instance;
-	uint16_t len;
-	char name[256] = {0};
 	struct bgp *bgp = bgp_get_default();
 	struct listnode *node;
 	struct prefix_ipv6 *c;
