@@ -3010,8 +3010,10 @@ static void bgp_zebra_process_srv6_locator_chunk(ZAPI_CALLBACK_ARGS)
 	uint16_t instance;
 	uint16_t len;
 	char name[256] = {0};
-	struct prefix_ipv6 *chunk = NULL;
-	chunk = prefix_ipv6_new();
+	struct bgp *bgp = bgp_get_default();
+	struct listnode *node;
+	struct prefix_ipv6 *c;
+	struct prefix_ipv6 *chunk = prefix_ipv6_new();
 
 	s = zclient->ibuf;
 	STREAM_GETC(s, proto);
@@ -3032,15 +3034,12 @@ static void bgp_zebra_process_srv6_locator_chunk(ZAPI_CALLBACK_ARGS)
 		return;
 	}
 
-	struct bgp *bgp = bgp_get_default();
 	if (strcmp(bgp->srv6_locator_name, name) != 0) {
 		zlog_info("name unmatch %s:%s",
 			  bgp->srv6_locator_name, name);
 		return;
 	}
 
-	struct listnode *node;
-	struct prefix_ipv6 *c;
 	for (ALL_LIST_ELEMENTS_RO(bgp->srv6_locator_chunks, node, c)) {
 		if (!prefix_cmp(c, chunk))
 			return;
@@ -3054,7 +3053,6 @@ stream_failure:
 	free(chunk);
 
 	zlog_err("%s: can't get locator_chunk!!", __func__);
-	return;
 }
 
 void bgp_zebra_init(struct thread_master *master, unsigned short instance)
@@ -3099,7 +3097,8 @@ void bgp_zebra_init(struct thread_master *master, unsigned short instance)
 	zclient->iptable_notify_owner = iptable_notify_owner;
 	zclient->route_notify_owner = bgp_zebra_route_notify_owner;
 	zclient->instance = instance;
-	zclient->process_srv6_locator_chunk = bgp_zebra_process_srv6_locator_chunk;
+	zclient->process_srv6_locator_chunk =
+		bgp_zebra_process_srv6_locator_chunk;
 }
 
 void bgp_zebra_destroy(void)
