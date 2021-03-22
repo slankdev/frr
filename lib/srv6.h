@@ -91,9 +91,9 @@ struct srv6_locator {
 	bool status_up;
 	struct list *chunks;
 
-	QOBJ_FIELDS
+	QOBJ_FIELDS;
 };
-DECLARE_QOBJ_TYPE(srv6_locator)
+DECLARE_QOBJ_TYPE(srv6_locator);
 
 struct srv6_locator_chunk {
 	char locator_name[SRV6_LOCNAME_SIZE];

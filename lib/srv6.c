@@ -22,9 +22,9 @@
 #include "srv6.h"
 #include "log.h"
 
-DEFINE_QOBJ_TYPE(srv6_locator)
-DEFINE_MTYPE_STATIC(LIB, SRV6_LOCATOR, "SRV6 locator")
-DEFINE_MTYPE_STATIC(LIB, SRV6_LOCATOR_CHUNK, "SRV6 locator chunk")
+DEFINE_QOBJ_TYPE(srv6_locator);
+DEFINE_MTYPE_STATIC(LIB, SRV6_LOCATOR, "SRV6 locator");
+DEFINE_MTYPE_STATIC(LIB, SRV6_LOCATOR_CHUNK, "SRV6 locator chunk");
 
 const char *seg6local_action2str(uint32_t action)
 {
