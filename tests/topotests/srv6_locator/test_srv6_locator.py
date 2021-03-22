@@ -62,7 +62,7 @@ def setup_module(mod):
     tgen = Topogen(TemplateTopo, mod.__name__)
     tgen.start_topology()
     router_list = tgen.routers()
-    for rname, router in tgen.routers().iteritems():
+    for rname, router in tgen.routers().items():
         router.run("/bin/bash {}/{}/setup.sh".format(CWD, rname))
         router.load_config(TopoRouter.RD_ZEBRA, os.path.join(CWD, '{}/zebra.conf'.format(rname)))
         router.load_config(TopoRouter.RD_BGP, os.path.join(CWD, '{}/bgpd.conf'.format(rname)))

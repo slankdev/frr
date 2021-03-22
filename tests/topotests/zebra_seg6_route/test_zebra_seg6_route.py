@@ -52,17 +52,17 @@ def open_json_file(filename):
         assert False, "Could not read file {}".format(filename)
 
 
-class Topo(Topo):
+class TemplateTopo(Topo):
     def build(self, **_opts):
         tgen = get_topogen(self)
         tgen.add_router("r1")
 
 
 def setup_module(mod):
-    tgen = Topogen(Topo, mod.__name__)
+    tgen = Topogen(TemplateTopo, mod.__name__)
     tgen.start_topology()
     router_list = tgen.routers()
-    for rname, router in tgen.routers().iteritems():
+    for rname, router in tgen.routers().items():
         router.run("/bin/bash {}".format(os.path.join(CWD, "{}/setup.sh".format(rname))))
         router.load_config(TopoRouter.RD_ZEBRA, os.path.join(CWD, '{}/zebra.conf'.format(rname)))
         router.load_config(TopoRouter.RD_SHARP, os.path.join(CWD, "{}/sharpd.conf".format(rname)))
