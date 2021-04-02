@@ -29,7 +29,6 @@
 #include "zebra/zserv.h"
 #include "zebra/zebra_router.h"
 #include "zebra/zebra_srv6.h"
-#include "zebra/zebra_memory.h"
 #include "zebra/zebra_errors.h"
 #include <stdio.h>
 #include <string.h>
