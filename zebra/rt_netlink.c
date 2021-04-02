@@ -441,6 +441,7 @@ static int parse_encap_seg6(struct rtattr *tb, struct in6_addr *segs)
 {
 	struct rtattr *tb_encap[256] = {};
 	struct seg6_iptunnel_encap *ipt = NULL;
+	struct in6_addr *segments = NULL;
 
 	netlink_parse_rtattr_nested(tb_encap, 256, tb);
 
@@ -450,7 +451,8 @@ static int parse_encap_seg6(struct rtattr *tb, struct in6_addr *segs)
 	if (tb_encap[SEG6_IPTUNNEL_SRH]) {
 		ipt = (struct seg6_iptunnel_encap *)
 			RTA_DATA(tb_encap[SEG6_IPTUNNEL_SRH]);
-		*segs = ipt->srh[0].segments[0];
+		segments = ipt->srh[0].segments;
+		*segs = segments[0];
 		return 1;
 	}
 
