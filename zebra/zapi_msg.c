@@ -1749,7 +1749,7 @@ static bool zapi_read_nexthops(struct zserv *client, struct prefix *p,
 					   &api_nh->labels[0]);
 		}
 
-		if (CHECK_FLAG(flags, ZEBRA_FLAG_SEG6LOCAL_ROUTE)
+		if (CHECK_FLAG(api_nh->flags, ZAPI_NEXTHOP_FLAG_SEG6LOCAL)
 		    && api_nh->type != NEXTHOP_TYPE_BLACKHOLE) {
 			if (IS_ZEBRA_DEBUG_RECV)
 				zlog_debug("%s: adding seg6local action %s",
@@ -1762,7 +1762,7 @@ static bool zapi_read_nexthops(struct zserv *client, struct prefix *p,
 						   &api_nh->seg6local_ctx);
 		}
 
-		if (CHECK_FLAG(flags, ZEBRA_FLAG_SEG6_ROUTE)
+		if (CHECK_FLAG(api_nh->flags, ZAPI_NEXTHOP_FLAG_SEG6)
 		    && api_nh->type != NEXTHOP_TYPE_BLACKHOLE) {
 			if (IS_ZEBRA_DEBUG_RECV)
 				zlog_debug("%s: adding seg6", __func__);
