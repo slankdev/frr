@@ -3,7 +3,6 @@
     {
       "prefix": "2001:1::/64",
       "protocol": "connected",
-      "vrfId": 6,
       "vrfName": "vrf10",
       "selected": true,
       "destSelected": true,
@@ -31,7 +30,6 @@
     {
       "prefix": "2001:2::/64",
       "protocol": "bgp",
-      "vrfId": 6,
       "vrfName": "vrf10",
       "selected": true,
       "destSelected": true,
@@ -68,7 +66,6 @@
     {
       "prefix": "2001:3::/64",
       "protocol": "connected",
-      "vrfId": 6,
       "vrfName": "vrf10",
       "selected": true,
       "destSelected": true,

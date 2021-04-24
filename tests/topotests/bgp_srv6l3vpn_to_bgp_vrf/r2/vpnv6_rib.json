@@ -100,7 +100,6 @@
             "origin": "incomplete",
             "announceNexthopSelf": true,
             "nhVrfName": "vrf10",
-            "nhVrfId": 6,
             "nexthops": [
               {
                 "ip": "::",
@@ -129,7 +128,6 @@
             "origin": "incomplete",
             "announceNexthopSelf": true,
             "nhVrfName": "vrf20",
-            "nhVrfId": 7,
             "nexthops": [
               {
                 "ip": "::",
@@ -156,7 +154,6 @@
             "origin": "incomplete",
             "announceNexthopSelf": true,
             "nhVrfName": "vrf20",
-            "nhVrfId": 7,
             "nexthops": [
               {
                 "ip": "::",
